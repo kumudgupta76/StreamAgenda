@@ -1,7 +1,14 @@
 import type {NextConfig} from 'next';
 
+const repo = 'your-repo-name';
+const assetPrefix = `/${repo}/`;
+const basePath = `/${repo}`;
+
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'export',
+  assetPrefix: process.env.NODE_ENV === 'production' ? assetPrefix : undefined,
+  basePath: process.env.NODE_ENV === 'production' ? basePath : undefined,
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,6 +16,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
