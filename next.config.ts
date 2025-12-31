@@ -1,6 +1,6 @@
 import type {NextConfig} from 'next';
 
-const repo = 'your-repo-name';
+const repo = 'StreamAgenda';
 const assetPrefix = `/${repo}/`;
 const basePath = `/${repo}`;
 
