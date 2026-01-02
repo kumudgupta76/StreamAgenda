@@ -81,7 +81,7 @@ function AgendaList({
     return (
         <aside className="w-64 flex flex-col border-r h-full bg-card">
             <div className="p-2 border-b">
-                <h2 className="text-lg font-semibold tracking-tight p-2">Agendas</h2>
+                <h2 className="text-lg font-semibold tracking-tight p-2">Tasks</h2>
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button size="sm" className="w-full">
