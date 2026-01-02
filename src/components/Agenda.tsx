@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from 'react';
-import { Plus, Trash2, Clipboard, Download, Edit, Save, Check } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useToast } from "@/hooks/use-toast";
 import { Label } from '@/components/ui/label';
 
 interface Task {
@@ -20,7 +19,6 @@ export function Agenda() {
   const [newTaskText, setNewTaskText] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskText, setEditingTaskText] = useState('');
-  const { toast } = useToast();
   
   const [isClient, setIsClient] = useState(false);
   useEffect(() => {
@@ -66,35 +64,8 @@ export function Agenda() {
     setEditingTaskText('');
   }
 
-  const handleCopyToClipboard = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        const agendaText = tasks.map(task => `${task.completed ? '✓' : '☐'} ${task.text}`).join('\n');
-        navigator.clipboard.writeText(`Agenda:\n${agendaText}`);
-        toast({
-          description: (
-            <div className="flex items-center gap-2 text-foreground">
-              <Check className="text-green-500" />
-              <span>Agenda copied to clipboard!</span>
-            </div>
-          ),
-        });
-    }
-  };
-
-  const handleExportMarkdown = () => {
-    if (typeof window !== 'undefined') {
-        const markdownContent = `# Stream Agenda\n\n${tasks.map(task => `- ${task.completed ? '[x]' : '[ ]'} ${task.text}`).join('\n')}`;
-        const blob = new Blob([markdownContent], { type: 'text/markdown' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'stream-agenda.md';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-  };
+  const completedTasks = tasks.filter(task => task.completed).length;
+  const totalTasks = tasks.length;
 
   return (
     <Card className={`w-full max-w-3xl shadow-2xl bg-card transition-all duration-500 ${isClient ? 'opacity-100' : 'opacity-0'}`}>
@@ -163,14 +134,13 @@ export function Agenda() {
            )}
         </ul>
       </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row justify-end gap-3 mt-4 border-t pt-6">
-        <Button variant="outline" size="lg" onClick={handleCopyToClipboard}>
-          <Clipboard className="mr-2 h-4 w-4" /> Copy for OBS
-        </Button>
-        <Button size="lg" onClick={handleExportMarkdown}>
-          <Download className="mr-2 h-4 w-4" /> Export Markdown
-        </Button>
-      </CardFooter>
+      {totalTasks > 0 && (
+        <CardFooter className="justify-end gap-3 mt-4 border-t pt-6">
+          <p className="text-lg font-semibold text-primary">
+            <span className="font-black">{completedTasks}/{totalTasks}</span> agenda covered
+          </p>
+        </CardFooter>
+      )}
     </Card>
   );
 }
