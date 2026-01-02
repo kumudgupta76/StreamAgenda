@@ -80,7 +80,7 @@ function AgendaList({
     setEditingAgendaName: (name: string) => void;
 }) {
     return (
-        <aside className="w-64 flex flex-col border-r h-full">
+        <aside className="w-64 flex flex-col border-r h-full bg-card">
             <div className="p-2 border-b">
                 <h2 className="text-lg font-semibold tracking-tight p-2">Agendas</h2>
                  <AlertDialog>
@@ -102,16 +102,16 @@ function AgendaList({
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
                                     handleCreateAgenda();
-                                    // Close dialog
-                                    (e.target as HTMLElement).closest('[role="dialog"]')
-                                        ?.querySelector('[aria-label="Close"]')
-                                        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-
+                                    const cancelButton = (e.target as HTMLElement).closest('[role="dialog"]')
+                                        ?.querySelector('[aria-label="Cancel"]');
+                                    if (cancelButton instanceof HTMLElement) {
+                                        cancelButton.click();
+                                    }
                                 }
                             }}
                         />
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogCancel aria-label="Cancel">Cancel</AlertDialogCancel>
                             <AlertDialogAction onClick={handleCreateAgenda}>Create</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
@@ -163,7 +163,7 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
         <AlertDialog>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                     <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto opacity-0 group-hover/item:opacity-100">
+                     <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
                         <MoreVertical className="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
