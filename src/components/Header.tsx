@@ -9,7 +9,7 @@ export function Header() {
       <div className="flex w-full items-center justify-between">
         <div className="flex items-center gap-3">
           <Presentation className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold font-headline tracking-tight">StreamAgenda</h1>
+          <h1 className="text-2xl font-bold font-headline tracking-tight">Task Buddy</h1>
         </div>
         <ThemeSwitcher />
       </div>
