@@ -1,4 +1,5 @@
-"use client"
+
+'use client';
 
 import * as React from 'react';
 import { useState, FormEvent, useEffect, useMemo } from 'react';
@@ -22,12 +23,10 @@ import {
 import {
     Sidebar,
     SidebarContent,
-    SidebarFooter,
     SidebarHeader,
     SidebarMenu,
     SidebarMenuItem,
     SidebarMenuButton,
-    SidebarTrigger
 } from '@/components/ui/sidebar';
 import {
     DropdownMenu,
@@ -49,7 +48,7 @@ interface AgendaGroup {
   tasks: Task[];
 }
 
-const LOCAL_STORAGE_KEY = 'streamAgendaData_v2';
+const LOCAL_STORAGE_KEY = 'streamAgendaData_v3';
 
 const getDefaultAgendas = (): AgendaGroup[] => {
     return [
@@ -91,9 +90,8 @@ function AgendaSidebar({
     return (
         <Sidebar>
             <SidebarHeader>
-                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl font-semibold">Agendas</CardTitle>
-                    <SidebarTrigger />
+                 <div className="flex items-center justify-between p-2">
+                    <h2 className="text-lg font-semibold tracking-tight">Agendas</h2>
                 </div>
             </SidebarHeader>
              <SidebarContent className="p-2">
@@ -350,11 +348,12 @@ export function Agenda() {
     const totalTasks = activeAgenda?.tasks.length || 0;
 
     if (!isClient) {
-        return <div className="flex-1" />; // Or a loading spinner
+        // Render a placeholder or loading state on the server
+        return <div className="flex-1 flex" />;
     }
 
     return (
-        <>
+        <div className="flex flex-1">
             <AgendaSidebar
                 agendaGroups={agendaGroups}
                 activeAgendaId={activeAgendaId}
@@ -369,12 +368,12 @@ export function Agenda() {
                 editingAgendaName={editingAgendaName}
                 setEditingAgendaName={setEditingAgendaName}
             />
-            <div className="flex-1 flex flex-col h-full">
-                <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent">
-                    <CardHeader>
+            <main className="flex-1 flex flex-col h-full">
+                <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
+                    <CardHeader className="border-b">
                         <CardTitle className="text-2xl font-bold">{activeAgenda?.name || 'Select an Agenda'}</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 flex flex-col gap-4 overflow-hidden">
+                    <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
                         <form onSubmit={handleAddTask} className="flex gap-2">
                             <Input
                                 value={newTaskText}
@@ -387,7 +386,7 @@ export function Agenda() {
                                 <Plus />
                             </Button>
                         </form>
-                        <ul className="space-y-3 flex-1 overflow-y-auto pr-2">
+                        <ul className="space-y-3 flex-1 overflow-y-auto pr-2 -mr-2">
                             {activeAgenda?.tasks.map((task, index) => (
                                 <li
                                     key={task.id}
@@ -407,7 +406,7 @@ export function Agenda() {
                                             className="flex-1 h-9 text-lg"
                                         />
                                     ) : (
-                                        <Label htmlFor={`task-${task.id}`} className={`flex-1 text-lg transition-colors ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'} cursor-text`} onDoubleClick={() => handleStartEdit(task)}>
+                                        <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
                                             {task.text}
                                         </Label>
                                     )}
@@ -456,9 +455,7 @@ export function Agenda() {
                         </CardFooter>
                     )}
                 </Card>
-            </div>
-        </>
+            </main>
+        </div>
     );
 }
-
-    
