@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,37 +159,21 @@ function AgendaList({
 
 function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () => void; onDelete: () => void; disabled: boolean }) {
     return (
-        <AlertDialog>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                     <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
-                        <MoreVertical className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={onRename}>
-                        <Edit className="mr-2 h-4 w-4" /> Rename
-                    </DropdownMenuItem>
-                    <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} disabled={disabled} className="text-destructive">
-                            <Trash className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete your agenda and all its tasks.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                 <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
+                    <MoreVertical className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                <DropdownMenuItem onSelect={onRename}>
+                    <Edit className="mr-2 h-4 w-4" /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive">
+                    <Trash className="mr-2 h-4 w-4" /> Delete
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     );
 }
 
