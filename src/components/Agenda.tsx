@@ -346,7 +346,7 @@ export function Agenda() {
             <main className="flex-1 flex flex-col h-full">
                 <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
                     <CardHeader className="border-b">
-                        <CardTitle className="text-2xl font-bold">{activeAgenda?.name || 'Select an Agenda'}</CardTitle>
+                        <CardTitle className="text-2xl font-bold">Agenda:{activeAgenda?.name || 'Select an Agenda'}</CardTitle>
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
                         <form onSubmit={handleAddTask} className="flex gap-2">
