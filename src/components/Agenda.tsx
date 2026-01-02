@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -353,7 +352,7 @@ export function Agenda() {
     }
 
     return (
-        <div className="flex flex-1">
+        <div className="flex flex-1 overflow-hidden">
             <AgendaSidebar
                 agendaGroups={agendaGroups}
                 activeAgendaId={activeAgendaId}
@@ -444,7 +443,7 @@ export function Agenda() {
                      {activeAgenda && totalTasks > 0 && (
                         <CardFooter className="justify-end gap-3 border-t pt-4">
                             {totalTasks > 0 && completedTasks === totalTasks ? (
-                                <p className="text-lg font-semibold text-green-600 flex items-center gap-2">
+                                <p className="text-lg font-semibold text-green-600 dark:text-green-500 flex items-center gap-2">
                                     <CheckCircle2 /> Everything Covered! 🎉
                                 </p>
                             ) : (
