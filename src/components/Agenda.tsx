@@ -20,20 +20,13 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuItem,
-    SidebarMenuButton,
-} from '@/components/ui/sidebar';
-import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Task {
   id: string;
@@ -59,7 +52,7 @@ const getDefaultAgendas = (): AgendaGroup[] => {
     ];
 };
 
-function AgendaSidebar({
+function AgendaList({
     agendaGroups,
     activeAgendaId,
     setActiveAgendaId,
@@ -87,13 +80,9 @@ function AgendaSidebar({
     setEditingAgendaName: (name: string) => void;
 }) {
     return (
-        <Sidebar>
-            <SidebarHeader>
-                 <div className="flex items-center justify-between p-2">
-                    <h2 className="text-lg font-semibold tracking-tight">Agendas</h2>
-                </div>
-            </SidebarHeader>
-             <SidebarContent className="p-2">
+        <aside className="w-64 flex flex-col border-r h-full">
+            <div className="p-2 border-b">
+                <h2 className="text-lg font-semibold tracking-tight p-2">Agendas</h2>
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button size="sm" className="w-full">
@@ -113,9 +102,11 @@ function AgendaSidebar({
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
                                     handleCreateAgenda();
+                                    // Close dialog
                                     (e.target as HTMLElement).closest('[role="dialog"]')
                                         ?.querySelector('[aria-label="Close"]')
                                         ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+
                                 }
                             }}
                         />
@@ -125,9 +116,11 @@ function AgendaSidebar({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-                <SidebarMenu>
+            </div>
+            <ScrollArea className="flex-1">
+                <div className="p-2">
                     {agendaGroups.map(agenda => (
-                        <SidebarMenuItem key={agenda.id} className="relative group/item">
+                        <div key={agenda.id} className="relative group/item">
                             {editingAgendaId === agenda.id ? (
                                 <div className="flex items-center gap-1 p-2">
                                     <Input
@@ -144,9 +137,9 @@ function AgendaSidebar({
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onMouseDown={() => handleRenameAgenda(agenda.id)}><Save className="h-4 w-4" /></Button>
                                 </div>
                             ) : (
-                               <SidebarMenuButton isActive={activeAgendaId === agenda.id} onClick={() => setActiveAgendaId(agenda.id)} className="w-full justify-start h-10">
+                               <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => setActiveAgendaId(agenda.id)} className="w-full justify-start h-10 gap-2">
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                    <span className="truncate flex-1">{agenda.name}</span>
+                                    <span className="truncate flex-1 text-left">{agenda.name}</span>
                                      <DropdownMenuForAgenda
                                         onRename={() => {
                                             setEditingAgendaId(agenda.id);
@@ -155,13 +148,13 @@ function AgendaSidebar({
                                         onDelete={() => handleDeleteAgenda(agenda.id)}
                                         disabled={agendaGroups.length <= 1}
                                     />
-                                </SidebarMenuButton>
+                                </Button>
                             )}
-                        </SidebarMenuItem>
+                        </div>
                     ))}
-                </SidebarMenu>
-            </SidebarContent>
-        </Sidebar>
+                </div>
+            </ScrollArea>
+        </aside>
     )
 }
 
@@ -353,7 +346,7 @@ export function Agenda() {
 
     return (
         <div className="flex flex-1 overflow-hidden">
-            <AgendaSidebar
+            <AgendaList
                 agendaGroups={agendaGroups}
                 activeAgendaId={activeAgendaId}
                 setActiveAgendaId={setActiveAgendaId}
@@ -385,60 +378,62 @@ export function Agenda() {
                                 <Plus />
                             </Button>
                         </form>
-                        <ul className="space-y-3 flex-1 overflow-y-auto pr-2 -mr-2">
-                            {activeAgenda?.tasks.map((task, index) => (
-                                <li
-                                    key={task.id}
-                                    className="flex items-center gap-4 p-3 rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md"
-                                >
-                                    <Checkbox id={`task-${task.id}`} checked={task.completed} onCheckedChange={() => handleToggleTask(task.id)} className="h-6 w-6 rounded-md" />
-                                    {editingTaskId === task.id ? (
-                                        <Input
-                                            value={editingTaskText}
-                                            onChange={(e) => setEditingTaskText(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(task.id); }
-                                                if (e.key === 'Escape') handleCancelEdit();
-                                            }}
-                                            onBlur={() => handleSaveEdit(task.id)}
-                                            autoFocus
-                                            className="flex-1 h-9 text-lg"
-                                        />
-                                    ) : (
-                                        <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
-                                            {task.text}
-                                        </Label>
-                                    )}
-                                    <div className="flex gap-1 ml-auto">
+                        <ScrollArea className="flex-1 -mr-4 pr-4">
+                            <ul className="space-y-3 pr-2">
+                                {activeAgenda?.tasks.map((task, index) => (
+                                    <li
+                                        key={task.id}
+                                        className="flex items-center gap-4 p-3 rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md"
+                                    >
+                                        <Checkbox id={`task-${task.id}`} checked={task.completed} onCheckedChange={() => handleToggleTask(task.id)} className="h-6 w-6 rounded-md" />
                                         {editingTaskId === task.id ? (
-                                            <Button variant="ghost" size="icon" onMouseDown={(e) => { e.preventDefault(); handleSaveEdit(task.id) }} aria-label="Save task">
-                                                <Save className="h-5 w-5 text-muted-foreground" />
-                                            </Button>
+                                            <Input
+                                                value={editingTaskText}
+                                                onChange={(e) => setEditingTaskText(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(task.id); }
+                                                    if (e.key === 'Escape') handleCancelEdit();
+                                                }}
+                                                onBlur={() => handleSaveEdit(task.id)}
+                                                autoFocus
+                                                className="flex-1 h-9 text-lg"
+                                            />
                                         ) : (
-                                            <Button variant="ghost" size="icon" onClick={() => handleStartEdit(task)} aria-label="Edit task">
-                                                <Edit className="h-5 w-5 text-muted-foreground hover:text-primary" />
-                                            </Button>
+                                            <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
+                                                {task.text}
+                                            </Label>
                                         )}
-                                        <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} aria-label="Delete task">
-                                            <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
-                                        </Button>
+                                        <div className="flex gap-1 ml-auto">
+                                            {editingTaskId === task.id ? (
+                                                <Button variant="ghost" size="icon" onMouseDown={(e) => { e.preventDefault(); handleSaveEdit(task.id) }} aria-label="Save task">
+                                                    <Save className="h-5 w-5 text-muted-foreground" />
+                                                </Button>
+                                            ) : (
+                                                <Button variant="ghost" size="icon" onClick={() => handleStartEdit(task)} aria-label="Edit task">
+                                                    <Edit className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                                                </Button>
+                                            )}
+                                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} aria-label="Delete task">
+                                                <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
+                                            </Button>
+                                        </div>
+                                    </li>
+                                ))}
+                                {totalTasks === 0 && activeAgenda && (
+                                    <div className="text-center text-muted-foreground py-8 h-full flex flex-col justify-center items-center">
+                                        <Circle className="h-12 w-12 mb-4" />
+                                        <p className="text-lg">Your agenda is empty.</p>
+                                        <p>Add some items to get started!</p>
                                     </div>
-                                </li>
-                            ))}
-                            {totalTasks === 0 && activeAgenda && (
-                                <div className="text-center text-muted-foreground py-8 h-full flex flex-col justify-center items-center">
-                                    <Circle className="h-12 w-12 mb-4" />
-                                    <p className="text-lg">Your agenda is empty.</p>
-                                    <p>Add some items to get started!</p>
-                                </div>
-                            )}
-                            {!activeAgenda && isClient && (
-                                <div className="text-center text-muted-foreground py-8 h-full flex flex-col justify-center items-center">
-                                    <p className="text-lg font-semibold">No agenda selected.</p>
-                                    <p>Create or select an agenda to begin.</p>
-                                </div>
-                            )}
-                        </ul>
+                                )}
+                                {!activeAgenda && isClient && (
+                                    <div className="text-center text-muted-foreground py-8 h-full flex flex-col justify-center items-center">
+                                        <p className="text-lg font-semibold">No agenda selected.</p>
+                                        <p>Create or select an agenda to begin.</p>
+                                    </div>
+                                )}
+                            </ul>
+                        </ScrollArea>
                     </CardContent>
                      {activeAgenda && totalTasks > 0 && (
                         <CardFooter className="justify-end gap-3 border-t pt-4">
