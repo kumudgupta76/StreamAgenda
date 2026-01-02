@@ -16,13 +16,7 @@ interface Task {
 }
 
 export function Agenda() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: '1', text: 'Introduction & Welcome', completed: true },
-    { id: '2', text: 'Topic 1: The Core Concept', completed: false },
-    { id: '3', text: 'Topic 2: Deep Dive', completed: false },
-    { id: '4', text: 'Q&A Session', completed: false },
-    { id: '5', text: 'Closing Remarks', completed: false },
-  ]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskText, setEditingTaskText] = useState('');
