@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -28,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 
 interface Task {
@@ -182,13 +185,68 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
 }
 
 
+function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) => void }) {
+    const [details, setDetails] = useState(task.details);
+
+    useEffect(() => {
+        setDetails(task.details);
+    }, [task.details]);
+
+    const handleSave = () => {
+        onSave(details);
+    };
+
+    return (
+        <div className="px-4 pb-4">
+            <Label className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
+            <Tabs defaultValue="edit" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="edit"><Edit className="mr-2" /> Edit</TabsTrigger>
+                    <TabsTrigger value="preview"><Eye className="mr-2" /> Preview</TabsTrigger>
+                </TabsList>
+                <TabsContent value="edit">
+                    <Textarea
+                        placeholder="Add notes, links, or details using Markdown...&#10;- [x] Checklist item&#10;- [ ] Another item&#10;[A link](https://example.com)"
+                        value={details}
+                        onChange={(e) => setDetails(e.target.value)}
+                        className="text-sm min-h-[120px] mt-2"
+                        rows={5}
+                    />
+                </TabsContent>
+                <TabsContent value="preview">
+                    <div className="prose prose-sm dark:prose-invert max-w-none rounded-md border min-h-[120px] mt-2 p-3 bg-muted/50">
+                        {details ? (
+                             <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                input: ({...props}) => {
+                                    if(props.type === 'checkbox') {
+                                        return <Checkbox checked={props.checked} disabled={props.disabled} />
+                                    }
+                                    return <input {...props} />
+                                }
+                            }}>
+                                {details}
+                            </ReactMarkdown>
+                        ) : (
+                            <p className="text-muted-foreground">Nothing to preview.</p>
+                        )}
+                    </div>
+                </TabsContent>
+            </Tabs>
+             <div className="flex justify-end mt-2">
+                <Button size="sm" onMouseDown={handleSave}>
+                    <Save className="mr-2" /> Save Details
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export function Agenda() {
     const [agendaGroups, setAgendaGroups] = useState<AgendaGroup[]>([]);
     const [activeAgendaId, setActiveAgendaId] = useState<string | null>(null);
     const [newTaskText, setNewTaskText] = useState('');
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [editingTaskText, setEditingTaskText] = useState('');
-    const [editingTaskDetails, setEditingTaskDetails] = useState('');
     const [newAgendaName, setNewAgendaName] = useState('');
     const [editingAgendaId, setEditingAgendaId] = useState<string | null>(null);
     const [editingAgendaName, setEditingAgendaName] = useState('');
@@ -345,7 +403,12 @@ export function Agenda() {
 
     if (!isClient) {
         // Render a placeholder or loading state on the server
-        return <div className="flex-1 flex" />;
+        return (
+            <div className="flex-1 flex overflow-hidden">
+                <aside className="w-64 flex flex-col border-r h-full bg-card" />
+                <main className="flex-1 flex flex-col h-full" />
+            </div>
+        )
     }
 
     return (
@@ -427,16 +490,7 @@ export function Agenda() {
                                                 </div>
                                             </div>
                                             <CollapsibleContent>
-                                                <div className="px-4 pb-4">
-                                                    <Label htmlFor={`details-${task.id}`} className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
-                                                    <Textarea
-                                                        id={`details-${task.id}`}
-                                                        placeholder="Add notes, links, or details..."
-                                                        defaultValue={task.details}
-                                                        onBlur={(e) => handleSaveDetails(task.id, e.target.value)}
-                                                        className="text-sm"
-                                                    />
-                                                </div>
+                                                <TaskDetails task={task} onSave={(newDetails) => handleSaveDetails(task.id, newDetails)} />
                                             </CollapsibleContent>
                                         </Collapsible>
                                     </li>
