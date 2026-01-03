@@ -62,9 +62,9 @@ function AgendaList({
     agendaGroups,
     activeAgendaId,
     setActiveAgendaId,
-    handleCreateAgenda,
     newAgendaName,
     setNewAgendaName,
+    handleCreateAgenda,
     handleDeleteAgenda,
     handleRenameAgenda,
     editingAgendaId,
@@ -75,9 +75,9 @@ function AgendaList({
     agendaGroups: AgendaGroup[];
     activeAgendaId: string | null;
     setActiveAgendaId: (id: string) => void;
-    handleCreateAgenda: () => void;
     newAgendaName: string;
     setNewAgendaName: (name: string) => void;
+    handleCreateAgenda: () => void;
     handleDeleteAgenda: (id: string) => void;
     handleRenameAgenda: (id: string) => void;
     editingAgendaId: string | null;
@@ -104,14 +104,13 @@ function AgendaList({
                             placeholder="e.g. Weekly Meeting"
                             value={newAgendaName}
                             onChange={(e) => setNewAgendaName(e.target.value)}
-                            onKeyDown={(e) => {
+                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
                                     handleCreateAgenda();
-                                    const cancelButton = (e.target as HTMLElement).closest('[role="dialog"]')
-                                        ?.querySelector('[aria-label="Cancel"]');
-                                    if (cancelButton instanceof HTMLElement) {
-                                        cancelButton.click();
+                                    const closeButton = (e.target as HTMLElement).closest('[role="dialog"]')?.querySelector('[aria-label="Cancel"]');
+                                    if (closeButton instanceof HTMLElement) {
+                                        closeButton.click();
                                     }
                                 }
                             }}
@@ -126,7 +125,7 @@ function AgendaList({
             <ScrollArea className="flex-1">
                 <div className="p-2">
                     {agendaGroups.map(agenda => (
-                        <div key={agenda.id} className="relative group/item">
+                        <div key={agenda.id} className="relative group/item flex items-center">
                             {editingAgendaId === agenda.id ? (
                                 <div className="flex items-center gap-1 p-2">
                                     <Input
@@ -143,18 +142,20 @@ function AgendaList({
                                     <Button size="icon" variant="ghost" className="h-8 w-8" onMouseDown={() => handleRenameAgenda(agenda.id)}><Save className="h-4 w-4" /></Button>
                                 </div>
                             ) : (
-                               <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => setActiveAgendaId(agenda.id)} className="w-full justify-start h-10 gap-2">
+                               <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => setActiveAgendaId(agenda.id)} className="w-full justify-start h-10 gap-2 flex-1">
                                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                                     <span className="truncate flex-1 text-left">{agenda.name}</span>
-                                     <DropdownMenuForAgenda
-                                        onRename={() => {
-                                            setEditingAgendaId(agenda.id);
-                                            setEditingAgendaName(agenda.name);
-                                        }}
-                                        onDelete={() => handleDeleteAgenda(agenda.id)}
-                                        disabled={agendaGroups.length <= 1}
-                                    />
                                 </Button>
+                            )}
+                             {editingAgendaId !== agenda.id && (
+                                <DropdownMenuForAgenda
+                                    onRename={() => {
+                                        setEditingAgendaId(agenda.id);
+                                        setEditingAgendaName(agenda.name);
+                                    }}
+                                    onDelete={() => handleDeleteAgenda(agenda.id)}
+                                    disabled={agendaGroups.length <= 1}
+                                />
                             )}
                         </div>
                     ))}
@@ -176,14 +177,13 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
                 <DropdownMenuItem onSelect={onRename}>
                     <Edit className="mr-2 h-4 w-4" /> Rename
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                 <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                     <Trash className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
     );
 }
-
 
 function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) => void }) {
     const [details, setDetails] = useState(task.details);
@@ -283,8 +283,10 @@ export function Agenda() {
                     // Quick migration for old data structure
                     const migratedData = parsedData.map(group => ({
                         ...group,
+                        id: group.id || crypto.randomUUID(),
                         tasks: group.tasks.map((task: any) => ({
                             ...task,
+                            id: task.id || crypto.randomUUID(),
                             details: task.details ?? '',
                         }))
                     }));
@@ -316,6 +318,9 @@ export function Agenda() {
             if(activeAgendaId) {
                 localStorage.setItem('activeAgendaId', activeAgendaId);
             }
+        } else if (isClient && agendaGroups.length === 0) {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            localStorage.removeItem('activeAgendaId');
         }
     }, [agendaGroups, activeAgendaId, isClient]);
 
@@ -399,6 +404,11 @@ export function Agenda() {
                 const newActiveId = newAgendas.length > 0 ? newAgendas[0].id : null;
                 setActiveAgendaId(newActiveId);
             }
+            if(newAgendas.length === 0) {
+                const defaultAgendas = getDefaultAgendas();
+                setAgendaGroups(defaultAgendas);
+                setActiveAgendaId(defaultAgendas[0].id);
+            }
             return newAgendas;
         });
     };
@@ -420,7 +430,7 @@ export function Agenda() {
     if (!isClient) {
         // Render a placeholder or loading state on the server
         return (
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex flex-1 overflow-hidden">
                 <aside className="w-64 flex flex-col border-r h-full bg-card" />
                 <main className="flex-1 flex flex-col h-full" />
             </div>
@@ -443,7 +453,7 @@ export function Agenda() {
                 editingAgendaName={editingAgendaName}
                 setEditingAgendaName={setEditingAgendaName}
             />
-            <main className="flex-1 flex flex-col h-full" style={{overflow:"auto"}}>
+            <main className="flex-1 flex flex-col h-full">
                 <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
                     <CardHeader className="border-b">
                         <CardTitle className="text-2xl font-bold">Agenda: {activeAgenda?.name || 'Select an Agenda'}</CardTitle>
@@ -461,7 +471,7 @@ export function Agenda() {
                                 <Plus />
                             </Button>
                         </form>
-                        <ScrollArea className="-mr-4 pr-4">
+                         <ScrollArea className="flex-1 -mr-4 pr-4">
                             <ul className="space-y-3 pr-2">
                                 {activeAgenda?.tasks.map((task) => (
                                      <li key={task.id} className="rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md">
@@ -478,7 +488,7 @@ export function Agenda() {
                                                         }}
                                                         onBlur={() => handleSaveEdit(task.id)}
                                                         autoFocus
-                                                        className="flex-1 h-9 text-lg"
+                                                        className="flex-1 h-9 text-base"
                                                     />
                                                 ) : (
                                                     <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
