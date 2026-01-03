@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -26,15 +26,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+
 
 interface Task {
   id: string;
   text: string;
+  details: string;
   completed: boolean;
 }
 
 interface AgendaGroup {
-  id: string;
+  id:string;
   name: string;
   tasks: Task[];
 }
@@ -184,6 +188,7 @@ export function Agenda() {
     const [newTaskText, setNewTaskText] = useState('');
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [editingTaskText, setEditingTaskText] = useState('');
+    const [editingTaskDetails, setEditingTaskDetails] = useState('');
     const [newAgendaName, setNewAgendaName] = useState('');
     const [editingAgendaId, setEditingAgendaId] = useState<string | null>(null);
     const [editingAgendaName, setEditingAgendaName] = useState('');
@@ -201,9 +206,17 @@ export function Agenda() {
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
                 if (Array.isArray(parsedData) && parsedData.length > 0) {
-                    setAgendaGroups(parsedData);
-                     const activeId = localStorage.getItem('activeAgendaId');
-                    setActiveAgendaId(activeId && parsedData.some(g => g.id === activeId) ? activeId : parsedData[0].id);
+                    // Quick migration for old data structure
+                    const migratedData = parsedData.map(group => ({
+                        ...group,
+                        tasks: group.tasks.map((task: any) => ({
+                            ...task,
+                            details: task.details ?? '',
+                        }))
+                    }));
+                    setAgendaGroups(migratedData);
+                    const activeId = localStorage.getItem('activeAgendaId');
+                    setActiveAgendaId(activeId && migratedData.some(g => g.id === activeId) ? activeId : migratedData[0].id);
                 } else {
                     const defaultAgendas = getDefaultAgendas();
                     setAgendaGroups(defaultAgendas);
@@ -248,6 +261,7 @@ export function Agenda() {
             const newTask: Task = {
                 id: crypto.randomUUID(),
                 text: newTaskText.trim(),
+                details: '',
                 completed: false,
             };
             updateTasksForActiveAgenda([...(activeAgenda.tasks || []), newTask]);
@@ -282,6 +296,13 @@ export function Agenda() {
         setEditingTaskId(null);
         setEditingTaskText('');
     }
+
+    const handleSaveDetails = (taskId: string, newDetails: string) => {
+        if (!activeAgenda) return;
+        updateTasksForActiveAgenda(activeAgenda.tasks.map(task =>
+            task.id === taskId ? { ...task, details: newDetails } : task
+        ));
+    };
 
     const handleCreateAgenda = () => {
         if (newAgendaName.trim()) {
@@ -346,7 +367,7 @@ export function Agenda() {
             <main className="flex-1 flex flex-col h-full">
                 <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
                     <CardHeader className="border-b">
-                        <CardTitle className="text-2xl font-bold">Agenda:{activeAgenda?.name || 'Select an Agenda'}</CardTitle>
+                        <CardTitle className="text-2xl font-bold">Agenda: {activeAgenda?.name || 'Select an Agenda'}</CardTitle>
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
                         <form onSubmit={handleAddTask} className="flex gap-2">
@@ -363,43 +384,61 @@ export function Agenda() {
                         </form>
                         <ScrollArea className="flex-1 -mr-4 pr-4">
                             <ul className="space-y-3 pr-2">
-                                {activeAgenda?.tasks.map((task, index) => (
-                                    <li
-                                        key={task.id}
-                                        className="flex items-center gap-4 p-3 rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md"
-                                    >
-                                        <Checkbox id={`task-${task.id}`} checked={task.completed} onCheckedChange={() => handleToggleTask(task.id)} className="h-6 w-6 rounded-md" />
-                                        {editingTaskId === task.id ? (
-                                            <Input
-                                                value={editingTaskText}
-                                                onChange={(e) => setEditingTaskText(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(task.id); }
-                                                    if (e.key === 'Escape') handleCancelEdit();
-                                                }}
-                                                onBlur={() => handleSaveEdit(task.id)}
-                                                autoFocus
-                                                className="flex-1 h-9 text-lg"
-                                            />
-                                        ) : (
-                                            <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
-                                                {task.text}
-                                            </Label>
-                                        )}
-                                        <div className="flex gap-1 ml-auto">
-                                            {editingTaskId === task.id ? (
-                                                <Button variant="ghost" size="icon" onMouseDown={(e) => { e.preventDefault(); handleSaveEdit(task.id) }} aria-label="Save task">
-                                                    <Save className="h-5 w-5 text-muted-foreground" />
-                                                </Button>
-                                            ) : (
-                                                <Button variant="ghost" size="icon" onClick={() => handleStartEdit(task)} aria-label="Edit task">
-                                                    <Edit className="h-5 w-5 text-muted-foreground hover:text-primary" />
-                                                </Button>
-                                            )}
-                                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} aria-label="Delete task">
-                                                <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
-                                            </Button>
-                                        </div>
+                                {activeAgenda?.tasks.map((task) => (
+                                     <li key={task.id} className="rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md">
+                                        <Collapsible>
+                                            <div className="flex items-center gap-4 p-3">
+                                                <Checkbox id={`task-${task.id}`} checked={task.completed} onCheckedChange={() => handleToggleTask(task.id)} className="h-6 w-6 rounded-md" />
+                                                {editingTaskId === task.id ? (
+                                                    <Input
+                                                        value={editingTaskText}
+                                                        onChange={(e) => setEditingTaskText(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(task.id); }
+                                                            if (e.key === 'Escape') handleCancelEdit();
+                                                        }}
+                                                        onBlur={() => handleSaveEdit(task.id)}
+                                                        autoFocus
+                                                        className="flex-1 h-9 text-lg"
+                                                    />
+                                                ) : (
+                                                    <Label htmlFor={`task-${task.id}`} className={cn('flex-1 text-lg transition-colors cursor-text', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
+                                                        {task.text}
+                                                    </Label>
+                                                )}
+                                                <div className="flex gap-1 ml-auto">
+                                                     <CollapsibleTrigger asChild>
+                                                        <Button variant="ghost" size="icon" aria-label="Toggle details">
+                                                            <NotepadText className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                                                        </Button>
+                                                    </CollapsibleTrigger>
+                                                    {editingTaskId === task.id ? (
+                                                        <Button variant="ghost" size="icon" onMouseDown={(e) => { e.preventDefault(); handleSaveEdit(task.id) }} aria-label="Save task">
+                                                            <Save className="h-5 w-5 text-muted-foreground" />
+                                                        </Button>
+                                                    ) : (
+                                                        <Button variant="ghost" size="icon" onClick={() => handleStartEdit(task)} aria-label="Edit task">
+                                                            <Edit className="h-5 w-5 text-muted-foreground hover:text-primary" />
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} aria-label="Delete task">
+                                                        <Trash2 className="h-5 w-5 text-muted-foreground hover:text-destructive" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <CollapsibleContent>
+                                                <div className="px-4 pb-4">
+                                                    <Label htmlFor={`details-${task.id}`} className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
+                                                    <Textarea
+                                                        id={`details-${task.id}`}
+                                                        placeholder="Add notes, links, or details..."
+                                                        defaultValue={task.details}
+                                                        onBlur={(e) => handleSaveDetails(task.id, e.target.value)}
+                                                        className="text-sm"
+                                                    />
+                                                </div>
+                                            </CollapsibleContent>
+                                        </Collapsible>
                                     </li>
                                 ))}
                                 {totalTasks === 0 && activeAgenda && (
