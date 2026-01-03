@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent, useEffect, useMemo } from 'react';
+import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -18,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import {
     DropdownMenu,
@@ -176,7 +175,7 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
                 <DropdownMenuItem onSelect={onRename}>
                     <Edit className="mr-2 h-4 w-4" /> Rename
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive">
+                <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                     <Trash className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
             </DropdownMenuContent>
@@ -187,14 +186,29 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
 
 function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) => void }) {
     const [details, setDetails] = useState(task.details);
+    const [isSaving, setIsSaving] = useState(false);
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setDetails(task.details);
     }, [task.details]);
 
-    const handleBlur = () => {
+    const handleSave = useCallback(() => {
+        setIsSaving(true);
         onSave(details);
-    };
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => {
+            setIsSaving(false);
+        }, 1000);
+    }, [details, onSave]);
+
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
 
     const defaultTab = task.details ? "preview" : "edit";
 
@@ -202,16 +216,19 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
         <div className="px-4 pb-4">
             <Label className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
             <Tabs defaultValue={defaultTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="edit"><Edit className="mr-2 h-4 w-4" /> Edit</TabsTrigger>
-                    <TabsTrigger value="preview"><Eye className="mr-2 h-4 w-4" /> Preview</TabsTrigger>
-                </TabsList>
+                <div className="flex items-center">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="edit"><Edit className="mr-2 h-4 w-4" /> Edit</TabsTrigger>
+                        <TabsTrigger value="preview"><Eye className="mr-2 h-4 w-4" /> Preview</TabsTrigger>
+                    </TabsList>
+                    {isSaving && <span className="text-xs text-muted-foreground ml-2 animate-pulse">Saving...</span>}
+                </div>
                 <TabsContent value="edit">
                     <Textarea
                         placeholder="Add notes, links, or details using Markdown...&#10;- [x] Checklist item&#10;- [ ] Another item&#10;[A link](https://example.com)"
                         value={details}
                         onChange={(e) => setDetails(e.target.value)}
-                        onBlur={handleBlur}
+                        onBlur={handleSave}
                         className="text-sm min-h-[120px] mt-2"
                         rows={5}
                     />
@@ -443,7 +460,7 @@ export function Agenda() {
                                 <Plus />
                             </Button>
                         </form>
-                        <ScrollArea className="flex-1 -mr-4 pr-4">
+                        <ScrollArea className="-mr-4 pr-4">
                             <ul className="space-y-3 pr-2">
                                 {activeAgenda?.tasks.map((task) => (
                                      <li key={task.id} className="rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md">
@@ -527,3 +544,5 @@ export function Agenda() {
         </div>
     );
 }
+
+    
