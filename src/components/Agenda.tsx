@@ -203,8 +203,8 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
             <Label className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
             <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="edit"><Edit className="mr-2" /> Edit</TabsTrigger>
-                    <TabsTrigger value="preview"><Eye className="mr-2" /> Preview</TabsTrigger>
+                    <TabsTrigger value="edit"><Edit className="mr-2 h-4 w-4" /> Edit</TabsTrigger>
+                    <TabsTrigger value="preview"><Eye className="mr-2 h-4 w-4" /> Preview</TabsTrigger>
                 </TabsList>
                 <TabsContent value="edit">
                     <Textarea
@@ -430,7 +430,7 @@ export function Agenda() {
                     <CardHeader className="border-b">
                         <CardTitle className="text-2xl font-bold">Agenda: {activeAgenda?.name || 'Select an Agenda'}</CardTitle>
                     </CardHeader>
-                    <CardContent className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
+                    <div className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
                         <form onSubmit={handleAddTask} className="flex gap-2">
                             <Input
                                 value={newTaskText}
@@ -508,7 +508,7 @@ export function Agenda() {
                                 )}
                             </ul>
                         </ScrollArea>
-                    </CardContent>
+                    </div>
                      {activeAgenda && totalTasks > 0 && (
                         <CardFooter className="justify-end gap-3 border-t pt-4">
                             {totalTasks > 0 && completedTasks === totalTasks ? (
