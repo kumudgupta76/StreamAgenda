@@ -18,6 +18,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import {
     DropdownMenu,
@@ -442,7 +443,7 @@ export function Agenda() {
                 editingAgendaName={editingAgendaName}
                 setEditingAgendaName={setEditingAgendaName}
             />
-            <main className="flex-1 flex flex-col h-full">
+            <main className="flex-1 flex flex-col h-full" style={{overflow:"auto"}}>
                 <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
                     <CardHeader className="border-b">
                         <CardTitle className="text-2xl font-bold">Agenda: {activeAgenda?.name || 'Select an Agenda'}</CardTitle>
@@ -544,5 +545,3 @@ export function Agenda() {
         </div>
     );
 }
-
-    
