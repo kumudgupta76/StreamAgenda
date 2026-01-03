@@ -192,14 +192,16 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
         setDetails(task.details);
     }, [task.details]);
 
-    const handleSave = () => {
+    const handleBlur = () => {
         onSave(details);
     };
+
+    const defaultTab = task.details ? "preview" : "edit";
 
     return (
         <div className="px-4 pb-4">
             <Label className="text-sm font-medium text-muted-foreground mb-2 block">Details</Label>
-            <Tabs defaultValue="edit" className="w-full">
+            <Tabs defaultValue={defaultTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="edit"><Edit className="mr-2" /> Edit</TabsTrigger>
                     <TabsTrigger value="preview"><Eye className="mr-2" /> Preview</TabsTrigger>
@@ -209,6 +211,7 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
                         placeholder="Add notes, links, or details using Markdown...&#10;- [x] Checklist item&#10;- [ ] Another item&#10;[A link](https://example.com)"
                         value={details}
                         onChange={(e) => setDetails(e.target.value)}
+                        onBlur={handleBlur}
                         className="text-sm min-h-[120px] mt-2"
                         rows={5}
                     />
@@ -227,16 +230,11 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
                                 {details}
                             </ReactMarkdown>
                         ) : (
-                            <p className="text-muted-foreground">Nothing to preview.</p>
+                            <p className="text-muted-foreground">Nothing to preview. Switch to Edit to add details.</p>
                         )}
                     </div>
                 </TabsContent>
             </Tabs>
-             <div className="flex justify-end mt-2">
-                <Button size="sm" onMouseDown={handleSave}>
-                    <Save className="mr-2" /> Save Details
-                </Button>
-            </div>
         </div>
     );
 }
