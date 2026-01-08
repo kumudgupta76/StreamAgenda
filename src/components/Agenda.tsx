@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ interface AgendaGroup {
   id:string;
   name: string;
   tasks: Task[];
+  archived: boolean;
 }
 
 const LOCAL_STORAGE_KEY = 'streamAgendaData_v3';
@@ -54,6 +55,7 @@ const getDefaultAgendas = (): AgendaGroup[] => {
         id: crypto.randomUUID(),
         name: 'My First Agenda',
         tasks: [],
+        archived: false,
       },
     ];
 };
@@ -67,6 +69,7 @@ function AgendaList({
     setNewAgendaName,
     handleDeleteAgenda,
     handleRenameAgenda,
+    handleArchiveAgenda,
     editingAgendaId,
     setEditingAgendaId,
     editingAgendaName,
@@ -80,6 +83,7 @@ function AgendaList({
     setNewAgendaName: (name: string) => void;
     handleDeleteAgenda: (id: string) => void;
     handleRenameAgenda: (id: string) => void;
+    handleArchiveAgenda: (id: string) => void;
     editingAgendaId: string | null;
     setEditingAgendaId: (id: string | null) => void;
     editingAgendaName: string;
@@ -125,7 +129,7 @@ function AgendaList({
             </div>
             <ScrollArea className="flex-1">
                 <div className="p-2">
-                    {agendaGroups.map(agenda => (
+                    {agendaGroups.filter(a => !a.archived).map(agenda => (
                         <div key={agenda.id} className="relative group/item">
                             {editingAgendaId === agenda.id ? (
                                 <div className="flex items-center gap-1 p-2">
@@ -152,19 +156,52 @@ function AgendaList({
                                             setEditingAgendaName(agenda.name);
                                         }}
                                         onDelete={() => handleDeleteAgenda(agenda.id)}
-                                        disabled={agendaGroups.length <= 1}
+                                        onArchive={() => handleArchiveAgenda(agenda.id)}
+                                        disabled={agendaGroups.filter(a => !a.archived).length <= 1}
+                                        isArchived={false}
                                     />
                                 </Button>
                             )}
                         </div>
                     ))}
+                    
+                    {agendaGroups.filter(a => a.archived).length > 0 && (
+                        <Collapsible className="mt-4">
+                            <CollapsibleTrigger asChild>
+                                <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground h-10">
+                                    <Archive className="h-4 w-4" />
+                                    Archived ({agendaGroups.filter(a => a.archived).length})
+                                </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                {agendaGroups.filter(a => a.archived).map(agenda => (
+                                    <div key={agenda.id} className="relative group/item">
+                                        <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => setActiveAgendaId(agenda.id)} className="w-full justify-start h-10 gap-2 opacity-70">
+                                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                                            <span className="truncate flex-1 text-left">{agenda.name}</span>
+                                            <DropdownMenuForAgenda
+                                                onRename={() => {
+                                                    setEditingAgendaId(agenda.id);
+                                                    setEditingAgendaName(agenda.name);
+                                                }}
+                                                onDelete={() => handleDeleteAgenda(agenda.id)}
+                                                onArchive={() => handleArchiveAgenda(agenda.id)}
+                                                disabled={false}
+                                                isArchived={true}
+                                            />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </CollapsibleContent>
+                        </Collapsible>
+                    )}
                 </div>
             </ScrollArea>
         </aside>
     )
 }
 
-function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () => void; onDelete: () => void; disabled: boolean }) {
+function DropdownMenuForAgenda({ onRename, onDelete, onArchive, disabled, isArchived }: { onRename: () => void; onDelete: () => void; onArchive: () => void; disabled: boolean; isArchived: boolean }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -175,6 +212,9 @@ function DropdownMenuForAgenda({ onRename, onDelete, disabled }: { onRename: () 
             <DropdownMenuContent>
                 <DropdownMenuItem onSelect={onRename}>
                     <Edit className="mr-2 h-4 w-4" /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onArchive} className="text-amber-600 focus:text-amber-600 focus:bg-amber-600/10">
+                    <Archive className="mr-2 h-4 w-4" /> {isArchived ? 'Unarchive' : 'Archive'}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onDelete} disabled={disabled} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                     <Trash className="mr-2 h-4 w-4" /> Delete
@@ -283,6 +323,7 @@ export function Agenda() {
                     // Quick migration for old data structure
                     const migratedData = parsedData.map(group => ({
                         ...group,
+                        archived: group.archived ?? false,
                         tasks: group.tasks.map((task: any) => ({
                             ...task,
                             details: task.details ?? '',
@@ -384,6 +425,7 @@ export function Agenda() {
                 id: crypto.randomUUID(),
                 name: newAgendaName.trim(),
                 tasks: [],
+                archived: false,
             };
             const updatedAgendas = [...agendaGroups, newAgenda];
             setAgendaGroups(updatedAgendas);
@@ -413,9 +455,16 @@ export function Agenda() {
         setEditingAgendaName('');
     }
 
+    const handleArchiveAgenda = (agendaId: string) => {
+        setAgendaGroups(prev => prev.map(agenda =>
+            agenda.id === agendaId ? { ...agenda, archived: !agenda.archived } : agenda
+        ));
+    };
 
-    const completedTasks = activeAgenda?.tasks.filter(task => task.completed).length || 0;
-    const totalTasks = activeAgenda?.tasks.length || 0;
+
+    const activeTasks = activeAgenda?.tasks || [];
+    const completedTasks = activeTasks.filter(task => task.completed).length;
+    const totalTasks = activeTasks.length;
 
     if (!isClient) {
         // Render a placeholder or loading state on the server
@@ -438,6 +487,7 @@ export function Agenda() {
                 setNewAgendaName={setNewAgendaName}
                 handleDeleteAgenda={handleDeleteAgenda}
                 handleRenameAgenda={handleRenameAgenda}
+                handleArchiveAgenda={handleArchiveAgenda}
                 editingAgendaId={editingAgendaId}
                 setEditingAgendaId={setEditingAgendaId}
                 editingAgendaName={editingAgendaName}
@@ -463,7 +513,7 @@ export function Agenda() {
                         </form>
                         <ScrollArea className="-mr-4 pr-4">
                             <ul className="space-y-3 pr-2">
-                                {activeAgenda?.tasks.map((task) => (
+                                {activeTasks.map((task) => (
                                      <li key={task.id} className="rounded-lg border bg-card/80 backdrop-blur-sm transition-shadow hover:shadow-md">
                                         <Collapsible>
                                             <div className="flex items-center gap-4 p-3">
