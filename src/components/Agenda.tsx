@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -420,6 +420,7 @@ export function Agenda() {
     const [editingAgendaName, setEditingAgendaName] = useState('');
     const [isClient, setIsClient] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isPresentationMode, setIsPresentationMode] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
@@ -475,6 +476,21 @@ export function Agenda() {
 
 
     const activeAgenda = useMemo(() => agendaGroups.find(agenda => agenda.id === activeAgendaId), [agendaGroups, activeAgendaId]);
+
+    // Keyboard navigation for presentation mode
+    useEffect(() => {
+        if (!isPresentationMode) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setIsPresentationMode(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isPresentationMode]);
 
     const updateTasksForActiveAgenda = (newTasks: Task[]) => {
         if (!activeAgendaId) return;
@@ -591,6 +607,124 @@ export function Agenda() {
 
     return (
         <div className="flex flex-1 overflow-hidden relative">
+            {/* Presentation Mode Overlay */}
+            {isPresentationMode && activeAgenda && (
+                <div className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-muted/30 flex flex-col animate-in fade-in duration-300">
+                    {/* Exit Button - floating */}
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setIsPresentationMode(false)}
+                        className="absolute top-4 right-4 gap-1 bg-background/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 z-10"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
+
+                    {/* Single Slide Content */}
+                    <div className="flex-1 flex items-center justify-center p-6 md:p-12 overflow-auto">
+                        <div className="w-full max-w-5xl bg-card rounded-2xl shadow-2xl border flex flex-col overflow-hidden">
+                            {/* Slide Header */}
+                            <div className="px-6 py-4 md:px-8 md:py-5 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-b">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <Presentation className="h-5 w-5 text-primary" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h1 className="text-lg md:text-xl font-bold text-foreground leading-tight truncate">
+                                            {activeAgenda.name}
+                                        </h1>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-muted-foreground text-xs md:text-sm shrink-0">
+                                        <span>{completedTasks}/{activeAgenda.tasks.length}</span>
+                                        <span>completed</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tasks List */}
+                            <div className="flex-1 p-6 md:p-10 overflow-auto max-h-[60vh]">
+                                {activeAgenda.tasks.length > 0 ? (
+                                    <ul className="space-y-4">
+                                        {activeAgenda.tasks.map((task, index) => (
+                                            <li 
+                                                key={task.id}
+                                                className={cn(
+                                                    "flex items-start gap-4 p-4 rounded-xl border transition-all",
+                                                    task.completed 
+                                                        ? "bg-green-500/5 border-green-500/20" 
+                                                        : "bg-muted/30 border-transparent hover:border-primary/20"
+                                                )}
+                                            >
+                                                <button
+                                                    onClick={() => handleToggleTask(task.id)}
+                                                    className={cn(
+                                                        "flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-0.5 transition-all",
+                                                        task.completed 
+                                                            ? "bg-green-500 text-white" 
+                                                            : "bg-primary/10 text-primary hover:bg-primary/20"
+                                                    )}
+                                                    aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                                                >
+                                                    {task.completed ? (
+                                                        <CheckCircle2 className="h-5 w-5" />
+                                                    ) : (
+                                                        <span className="font-bold text-sm">{index + 1}</span>
+                                                    )}
+                                                </button>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn(
+                                                            "text-lg md:text-xl font-medium",
+                                                            task.completed && "line-through text-muted-foreground"
+                                                        )}>
+                                                            {task.text}
+                                                        </span>
+                                                    </div>
+                                                    {task.details && (
+                                                        <div className="mt-2 text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
+                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                                {task.details}
+                                                            </ReactMarkdown>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div className="text-center py-12 text-muted-foreground">
+                                        <p className="text-lg">No items in this agenda</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Slide Footer */}
+                            <div className="px-8 py-4 border-t bg-muted/30 flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </span>
+                                <div className="flex items-center gap-2 text-sm font-medium">
+                                    {completedTasks === totalTasks && totalTasks > 0 ? (
+                                        <span className="text-green-600 flex items-center gap-1">
+                                            <CheckCircle2 className="h-4 w-4" /> All items completed!
+                                        </span>
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            {completedTasks} of {totalTasks} completed
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Keyboard Hint */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground/50">
+                        Press ESC to exit
+                    </div>
+                </div>
+            )}
+
             {/* Mobile sidebar overlay */}
             {isMobileSidebarOpen && (
                 <div 
@@ -670,6 +804,18 @@ export function Agenda() {
                                     </div>
                                 )}
                             </div>
+                            {activeAgenda && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => setIsPresentationMode(true)}
+                                    className="shrink-0 gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
+                                    aria-label="Present agenda"
+                                >
+                                    <Presentation className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Present</span>
+                                </Button>
+                            )}
                         </div>
                     </CardHeader>
                     <div className="flex-1 flex flex-col gap-4 p-4 md:p-6 overflow-hidden">
