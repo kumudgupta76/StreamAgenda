@@ -651,7 +651,7 @@ export function Agenda() {
                                                 className={cn(
                                                     "flex items-start gap-4 p-4 rounded-xl border transition-all",
                                                     task.completed 
-                                                        ? "bg-green-500/5 border-green-500/20" 
+                                                        ? "bg-primary/5 border-primary/20 opacity-70" 
                                                         : "bg-muted/30 border-transparent hover:border-primary/20"
                                                 )}
                                             >
@@ -660,7 +660,7 @@ export function Agenda() {
                                                     className={cn(
                                                         "flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-0.5 transition-all",
                                                         task.completed 
-                                                            ? "bg-green-500 text-white" 
+                                                            ? "bg-primary text-primary-foreground" 
                                                             : "bg-primary/10 text-primary hover:bg-primary/20"
                                                     )}
                                                     aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
@@ -675,7 +675,7 @@ export function Agenda() {
                                                     <div className="flex items-center gap-2">
                                                         <span className={cn(
                                                             "text-lg md:text-xl font-medium",
-                                                            task.completed && "line-through text-muted-foreground"
+                                                            task.completed && "text-muted-foreground"
                                                         )}>
                                                             {task.text}
                                                         </span>
@@ -705,7 +705,7 @@ export function Agenda() {
                                 </span>
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     {completedTasks === totalTasks && totalTasks > 0 ? (
-                                        <span className="text-green-600 flex items-center gap-1">
+                                        <span className="text-primary flex items-center gap-1">
                                             <CheckCircle2 className="h-4 w-4" /> All items completed!
                                         </span>
                                     ) : (
