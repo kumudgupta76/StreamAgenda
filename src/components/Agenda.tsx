@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,155 @@ interface Task {
   text: string;
   details: string;
   completed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  dueDate?: string;
+}
+
+// Helper function to get relative time string
+function getRelativeTimeString(dueDate: string): { text: string; isOverdue: boolean; urgency: 'overdue' | 'urgent' | 'soon' | 'normal' } {
+  const now = new Date();
+  const due = new Date(dueDate);
+  const diffMs = due.getTime() - now.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  const isOverdue = diffMs < 0;
+  const absDiffMins = Math.abs(diffMins);
+  const absDiffHours = Math.abs(diffHours);
+  const absDiffDays = Math.abs(diffDays);
+
+  let text: string;
+  let urgency: 'overdue' | 'urgent' | 'soon' | 'normal';
+
+  if (isOverdue) {
+    urgency = 'overdue';
+    if (absDiffDays >= 1) {
+      text = `${absDiffDays} day${absDiffDays > 1 ? 's' : ''} overdue`;
+    } else if (absDiffHours >= 1) {
+      text = `${absDiffHours} hour${absDiffHours > 1 ? 's' : ''} overdue`;
+    } else {
+      text = `${absDiffMins} min${absDiffMins > 1 ? 's' : ''} overdue`;
+    }
+  } else {
+    if (diffDays >= 7) {
+      urgency = 'normal';
+      text = `Due in ${diffDays} days`;
+    } else if (diffDays >= 1) {
+      urgency = diffDays <= 2 ? 'soon' : 'normal';
+      text = `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    } else if (diffHours >= 1) {
+      urgency = diffHours <= 4 ? 'urgent' : 'soon';
+      text = `Due in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+    } else if (diffMins > 0) {
+      urgency = 'urgent';
+      text = `Due in ${diffMins} min${diffMins > 1 ? 's' : ''}`;
+    } else {
+      urgency = 'urgent';
+      text = 'Due now';
+    }
+  }
+
+  return { text, isOverdue, urgency };
+}
+
+// Due Date Badge Component
+function DueDateBadge({ dueDate, showAbsolute, onClick, completed }: { dueDate: string; showAbsolute: boolean; onClick: () => void; completed: boolean }) {
+  const { text, isOverdue, urgency } = getRelativeTimeString(dueDate);
+  const absoluteText = new Date(dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  
+  if (completed) {
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1 hover:bg-muted/80 transition-colors"
+      >
+        <CalendarClock className="h-3 w-3" />
+        {showAbsolute ? absoluteText : text}
+      </button>
+    );
+  }
+
+  const colorClasses = {
+    overdue: 'bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20',
+    urgent: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20',
+    soon: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20',
+    normal: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20',
+  };
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className={cn(
+        "text-xs px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors font-medium",
+        colorClasses[urgency]
+      )}
+      title={showAbsolute ? text : absoluteText}
+    >
+      {isOverdue ? <AlertTriangle className="h-3 w-3" /> : <CalendarClock className="h-3 w-3" />}
+      {showAbsolute ? absoluteText : text}
+    </button>
+  );
+}
+
+// Due Date Editor Component  
+function DueDateEditor({ dueDate, onSave, onRemove }: { dueDate?: string; onSave: (date: string) => void; onRemove: () => void }) {
+  // Convert ISO string to local datetime-local format (YYYY-MM-DDTHH:mm)
+  const toLocalDateTimeString = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const [localDate, setLocalDate] = useState(toLocalDateTimeString(dueDate));
+  
+  const handleSave = () => {
+    if (localDate) {
+      // datetime-local gives us local time, convert to ISO
+      onSave(new Date(localDate).toISOString());
+    }
+  };
+
+  // Quick date buttons - set to local time
+  const setQuickDate = (hours: number) => {
+    const date = new Date();
+    date.setHours(date.getHours() + hours);
+    setLocalDate(toLocalDateTimeString(date.toISOString()));
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 flex-1">
+      <Input
+        type="datetime-local"
+        value={localDate}
+        onChange={(e) => setLocalDate(e.target.value)}
+        className="w-auto h-7 text-xs px-2"
+      />
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground">Quick:</span>
+        <button onClick={() => setQuickDate(1)} className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 transition-colors">1h</button>
+        <button onClick={() => setQuickDate(4)} className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 transition-colors">4h</button>
+        <button onClick={() => setQuickDate(24)} className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 transition-colors">1d</button>
+        <button onClick={() => setQuickDate(24 * 7)} className="text-xs px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 transition-colors">1w</button>
+      </div>
+      <div className="flex items-center gap-1 ml-auto">
+        <Button size="sm" variant="outline" onClick={handleSave} disabled={!localDate} className="h-7 px-2 text-xs">
+          <Save className="h-3 w-3 mr-1" /> Set
+        </Button>
+        {dueDate && (
+          <Button size="sm" variant="ghost" onClick={onRemove} className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
+            <CalendarX className="h-3 w-3 mr-1" /> Remove
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 interface AgendaGroup {
@@ -46,6 +195,7 @@ interface AgendaGroup {
   name: string;
   tasks: Task[];
   archived: boolean;
+  pinned?: boolean;
 }
 
 const LOCAL_STORAGE_KEY = 'streamAgendaData_v3';
@@ -71,6 +221,8 @@ function AgendaList({
     handleDeleteAgenda,
     handleRenameAgenda,
     handleArchiveAgenda,
+    handlePinAgenda,
+    handleReorderAgendas,
     editingAgendaId,
     setEditingAgendaId,
     editingAgendaName,
@@ -87,6 +239,8 @@ function AgendaList({
     handleDeleteAgenda: (id: string) => void;
     handleRenameAgenda: (id: string) => void;
     handleArchiveAgenda: (id: string) => void;
+    handlePinAgenda: (id: string) => void;
+    handleReorderAgendas: (draggedId: string, targetId: string) => void;
     editingAgendaId: string | null;
     setEditingAgendaId: (id: string | null) => void;
     editingAgendaName: string;
@@ -94,6 +248,37 @@ function AgendaList({
     onClose?: () => void;
     isMobile?: boolean;
 }) {
+    // Drag and drop state for reordering agendas
+    const [draggedAgendaId, setDraggedAgendaId] = useState<string | null>(null);
+    const [dragOverAgendaId, setDragOverAgendaId] = useState<string | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, agendaId: string) => {
+        setDraggedAgendaId(agendaId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', agendaId);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedAgendaId(null);
+        setDragOverAgendaId(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent, agendaId: string) => {
+        e.preventDefault();
+        if (agendaId !== draggedAgendaId) {
+            setDragOverAgendaId(agendaId);
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, targetAgendaId: string) => {
+        e.preventDefault();
+        if (draggedAgendaId && draggedAgendaId !== targetAgendaId) {
+            handleReorderAgendas(draggedAgendaId, targetAgendaId);
+        }
+        setDraggedAgendaId(null);
+        setDragOverAgendaId(null);
+    };
+
     const handleAgendaSelect = (id: string) => {
         setActiveAgendaId(id);
         if (isMobile && onClose) {
@@ -152,11 +337,32 @@ function AgendaList({
             </div>
             <ScrollArea className="flex-1">
                 <div className="p-2 space-y-1">
-                    {agendaGroups.filter(a => !a.archived).map(agenda => {
+                    {/* Sort agendas: pinned first, then unpinned */}
+                    {agendaGroups
+                        .filter(a => !a.archived)
+                        .sort((a, b) => {
+                            if (a.pinned && !b.pinned) return -1;
+                            if (!a.pinned && b.pinned) return 1;
+                            return 0;
+                        })
+                        .map(agenda => {
                         const taskCount = agenda.tasks.length;
                         const completedCount = agenda.tasks.filter(t => t.completed).length;
                         return (
-                        <div key={agenda.id} className="relative group/item">
+                        <div 
+                            key={agenda.id} 
+                            className={cn(
+                                "relative group/item",
+                                draggedAgendaId === agenda.id && "opacity-50",
+                                dragOverAgendaId === agenda.id && "ring-2 ring-primary ring-offset-1 rounded-lg"
+                            )}
+                            draggable={editingAgendaId !== agenda.id}
+                            onDragStart={(e) => handleDragStart(e, agenda.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleDragOver(e, agenda.id)}
+                            onDragLeave={() => setDragOverAgendaId(null)}
+                            onDrop={(e) => handleDrop(e, agenda.id)}
+                        >
                             {editingAgendaId === agenda.id ? (
                                 <div className="flex items-center gap-1 p-2">
                                     <Input
@@ -177,15 +383,20 @@ function AgendaList({
                                     variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} 
                                     onClick={() => handleAgendaSelect(agenda.id)} 
                                     className={cn(
-                                        "w-full justify-start h-auto py-2.5 px-3 gap-3 transition-all",
+                                        "w-full justify-start h-auto py-2.5 px-3 gap-2 transition-all",
                                         activeAgendaId === agenda.id && "shadow-sm ring-1 ring-primary/20"
                                     )}
                                 >
+                                    {/* Drag Handle */}
+                                    <GripVertical className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
                                     <div className={cn(
-                                        "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                                        "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors relative",
                                         activeAgendaId === agenda.id ? "bg-primary text-primary-foreground" : "bg-muted"
                                     )}>
                                         <FileText className="h-4 w-4" />
+                                        {agenda.pinned && (
+                                            <Pin className="h-3 w-3 absolute -top-1 -right-1 text-blue-500" />
+                                        )}
                                     </div>
                                     <div className="flex-1 text-left min-w-0">
                                         <span className="truncate block font-medium">{agenda.name}</span>
@@ -202,8 +413,10 @@ function AgendaList({
                                         }}
                                         onDelete={() => handleDeleteAgenda(agenda.id)}
                                         onArchive={() => handleArchiveAgenda(agenda.id)}
+                                        onPin={() => handlePinAgenda(agenda.id)}
                                         disabled={agendaGroups.filter(a => !a.archived).length <= 1}
                                         isArchived={false}
+                                        isPinned={agenda.pinned ?? false}
                                     />
                                 </Button>
                             )}
@@ -233,8 +446,10 @@ function AgendaList({
                                                 }}
                                                 onDelete={() => handleDeleteAgenda(agenda.id)}
                                                 onArchive={() => handleArchiveAgenda(agenda.id)}
+                                                onPin={() => handlePinAgenda(agenda.id)}
                                                 disabled={false}
                                                 isArchived={true}
+                                                isPinned={agenda.pinned ?? false}
                                             />
                                         </Button>
                                     </div>
@@ -248,7 +463,7 @@ function AgendaList({
     )
 }
 
-function DropdownMenuForAgenda({ onRename, onDelete, onArchive, disabled, isArchived }: { onRename: () => void; onDelete: () => void; onArchive: () => void; disabled: boolean; isArchived: boolean }) {
+function DropdownMenuForAgenda({ onRename, onDelete, onArchive, onPin, disabled, isArchived, isPinned }: { onRename: () => void; onDelete: () => void; onArchive: () => void; onPin: () => void; disabled: boolean; isArchived: boolean; isPinned: boolean }) {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -257,6 +472,10 @@ function DropdownMenuForAgenda({ onRename, onDelete, onArchive, disabled, isArch
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
+                <DropdownMenuItem onSelect={onPin} className="text-blue-600 focus:text-blue-600 focus:bg-blue-600/10">
+                    {isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                    {isPinned ? 'Unpin' : 'Pin to top'}
+                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onRename}>
                     <Edit className="mr-2 h-4 w-4" /> Rename
                 </DropdownMenuItem>
@@ -421,6 +640,7 @@ export function Agenda() {
     const [isClient, setIsClient] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isPresentationMode, setIsPresentationMode] = useState(false);
+    const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
     useEffect(() => {
         setIsClient(true);
@@ -435,12 +655,16 @@ export function Agenda() {
                 const parsedData = JSON.parse(savedData);
                 if (Array.isArray(parsedData) && parsedData.length > 0) {
                     // Quick migration for old data structure
+                    const now = new Date().toISOString();
                     const migratedData = parsedData.map(group => ({
                         ...group,
                         archived: group.archived ?? false,
                         tasks: group.tasks.map((task: any) => ({
                             ...task,
                             details: task.details ?? '',
+                            createdAt: task.createdAt ?? now,
+                            updatedAt: task.updatedAt ?? now,
+                            dueDate: task.dueDate,
                         }))
                     }));
                     setAgendaGroups(migratedData);
@@ -502,14 +726,19 @@ export function Agenda() {
     const handleAddTask = (e: FormEvent) => {
         e.preventDefault();
         if (newTaskText.trim() && activeAgenda) {
+            const now = new Date().toISOString();
+            const taskId = crypto.randomUUID();
             const newTask: Task = {
-                id: crypto.randomUUID(),
+                id: taskId,
                 text: newTaskText.trim(),
                 details: '',
                 completed: false,
+                createdAt: now,
+                updatedAt: now,
             };
             updateTasksForActiveAgenda([...(activeAgenda.tasks || []), newTask]);
             setNewTaskText('');
+            setExpandedTaskId(taskId); // Auto-expand the new task
         }
     };
 
@@ -520,7 +749,8 @@ export function Agenda() {
 
     const handleToggleTask = (id: string) => {
         if (!activeAgenda) return;
-        updateTasksForActiveAgenda(activeAgenda.tasks.map(task => task.id === id ? { ...task, completed: !task.completed } : task));
+        const now = new Date().toISOString();
+        updateTasksForActiveAgenda(activeAgenda.tasks.map(task => task.id === id ? { ...task, completed: !task.completed, updatedAt: now } : task));
     };
 
     const handleStartEdit = (task: Task) => {
@@ -530,7 +760,8 @@ export function Agenda() {
 
     const handleSaveEdit = (id: string) => {
         if (editingTaskText.trim() && activeAgenda) {
-            updateTasksForActiveAgenda(activeAgenda.tasks.map(task => task.id === id ? { ...task, text: editingTaskText.trim() } : task));
+            const now = new Date().toISOString();
+            updateTasksForActiveAgenda(activeAgenda.tasks.map(task => task.id === id ? { ...task, text: editingTaskText.trim(), updatedAt: now } : task));
         }
         setEditingTaskId(null);
         setEditingTaskText('');
@@ -543,9 +774,89 @@ export function Agenda() {
 
     const handleSaveDetails = (taskId: string, newDetails: string) => {
         if (!activeAgenda) return;
+        const now = new Date().toISOString();
         updateTasksForActiveAgenda(activeAgenda.tasks.map(task =>
-            task.id === taskId ? { ...task, details: newDetails } : task
+            task.id === taskId ? { ...task, details: newDetails, updatedAt: now } : task
         ));
+    };
+
+    const handleSetDueDate = (taskId: string, dueDate: string) => {
+        if (!activeAgenda) return;
+        const now = new Date().toISOString();
+        updateTasksForActiveAgenda(activeAgenda.tasks.map(task =>
+            task.id === taskId ? { ...task, dueDate, updatedAt: now } : task
+        ));
+    };
+
+    const handleRemoveDueDate = (taskId: string) => {
+        if (!activeAgenda) return;
+        const now = new Date().toISOString();
+        updateTasksForActiveAgenda(activeAgenda.tasks.map(task =>
+            task.id === taskId ? { ...task, dueDate: undefined, updatedAt: now } : task
+        ));
+    };
+
+    // State for toggling relative/absolute time display per task
+    const [showAbsoluteTime, setShowAbsoluteTime] = useState<Record<string, boolean>>({});
+    const toggleTimeDisplay = (taskId: string) => {
+        setShowAbsoluteTime(prev => ({ ...prev, [taskId]: !prev[taskId] }));
+    };
+
+    // Drag and drop state for reordering tasks
+    const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+    const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+
+    const handleDragStart = (e: React.DragEvent, taskId: string) => {
+        setDraggedTaskId(taskId);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', taskId);
+        // Add a slight delay to allow the drag image to be created
+        setTimeout(() => {
+            const element = e.target as HTMLElement;
+            element.style.opacity = '0.5';
+        }, 0);
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+        const element = e.target as HTMLElement;
+        element.style.opacity = '1';
+        setDraggedTaskId(null);
+        setDragOverTaskId(null);
+    };
+
+    const handleDragOver = (e: React.DragEvent, taskId: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (taskId !== draggedTaskId) {
+            setDragOverTaskId(taskId);
+        }
+    };
+
+    const handleDragLeave = () => {
+        setDragOverTaskId(null);
+    };
+
+    const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
+        e.preventDefault();
+        if (!activeAgenda || !draggedTaskId || draggedTaskId === targetTaskId) {
+            setDraggedTaskId(null);
+            setDragOverTaskId(null);
+            return;
+        }
+
+        const tasks = [...activeAgenda.tasks];
+        const draggedIndex = tasks.findIndex(t => t.id === draggedTaskId);
+        const targetIndex = tasks.findIndex(t => t.id === targetTaskId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Remove the dragged task and insert it at the target position
+        const [draggedTask] = tasks.splice(draggedIndex, 1);
+        tasks.splice(targetIndex, 0, draggedTask);
+
+        updateTasksForActiveAgenda(tasks);
+        setDraggedTaskId(null);
+        setDragOverTaskId(null);
     };
 
     const handleCreateAgenda = () => {
@@ -588,6 +899,27 @@ export function Agenda() {
         setAgendaGroups(prev => prev.map(agenda =>
             agenda.id === agendaId ? { ...agenda, archived: !agenda.archived } : agenda
         ));
+    };
+
+    const handlePinAgenda = (agendaId: string) => {
+        setAgendaGroups(prev => prev.map(agenda =>
+            agenda.id === agendaId ? { ...agenda, pinned: !agenda.pinned } : agenda
+        ));
+    };
+
+    const handleReorderAgendas = (draggedId: string, targetId: string) => {
+        setAgendaGroups(prev => {
+            const agendas = [...prev];
+            const draggedIndex = agendas.findIndex(a => a.id === draggedId);
+            const targetIndex = agendas.findIndex(a => a.id === targetId);
+            
+            if (draggedIndex === -1 || targetIndex === -1) return prev;
+            
+            const [draggedAgenda] = agendas.splice(draggedIndex, 1);
+            agendas.splice(targetIndex, 0, draggedAgenda);
+            
+            return agendas;
+        });
     };
 
 
@@ -745,6 +1077,8 @@ export function Agenda() {
                     handleDeleteAgenda={handleDeleteAgenda}
                     handleRenameAgenda={handleRenameAgenda}
                     handleArchiveAgenda={handleArchiveAgenda}
+                    handlePinAgenda={handlePinAgenda}
+                    handleReorderAgendas={handleReorderAgendas}
                     editingAgendaId={editingAgendaId}
                     setEditingAgendaId={setEditingAgendaId}
                     editingAgendaName={editingAgendaName}
@@ -767,6 +1101,8 @@ export function Agenda() {
                     handleDeleteAgenda={handleDeleteAgenda}
                     handleRenameAgenda={handleRenameAgenda}
                     handleArchiveAgenda={handleArchiveAgenda}
+                    handlePinAgenda={handlePinAgenda}
+                    handleReorderAgendas={handleReorderAgendas}
                     editingAgendaId={editingAgendaId}
                     setEditingAgendaId={setEditingAgendaId}
                     editingAgendaName={editingAgendaName}
@@ -842,17 +1178,40 @@ export function Agenda() {
                         </form>
                         <ScrollArea className="-mr-4 pr-4 flex-1">
                             <ul className="space-y-2 pr-2">
-                                {activeTasks.map((task, index) => (
+                                {activeTasks.map((task, index) => {
+                                    const isOverdue = task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
+                                    const isUrgent = task.dueDate && !task.completed && !isOverdue && (new Date(task.dueDate).getTime() - new Date().getTime()) < 4 * 60 * 60 * 1000;
+                                    return (
                                      <li 
                                         key={task.id} 
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, task.id)}
+                                        onDragEnd={handleDragEnd}
+                                        onDragOver={(e) => handleDragOver(e, task.id)}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={(e) => handleDrop(e, task.id)}
                                         className={cn(
                                             "group rounded-xl border bg-card shadow-sm transition-all duration-200 hover:shadow-md",
-                                            task.completed && "opacity-60 bg-muted/50"
+                                            task.completed && "opacity-60 bg-muted/50",
+                                            isOverdue && "border-l-4 border-l-red-500 bg-red-500/5",
+                                            isUrgent && !isOverdue && "border-l-4 border-l-orange-500 bg-orange-500/5",
+                                            draggedTaskId === task.id && "opacity-50 scale-[0.98]",
+                                            dragOverTaskId === task.id && "ring-2 ring-primary ring-offset-2"
                                         )}
                                         style={{ animationDelay: `${index * 50}ms` }}
                                     >
-                                        <Collapsible>
+                                        <Collapsible 
+                                            open={expandedTaskId === task.id} 
+                                            onOpenChange={(open) => setExpandedTaskId(open ? task.id : null)}
+                                        >
                                             <div className="flex items-center gap-2 md:gap-3 p-3 md:p-4">
+                                                {/* Drag Handle */}
+                                                <div 
+                                                    className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                >
+                                                    <GripVertical className="h-4 w-4 md:h-5 md:w-5" />
+                                                </div>
                                                 <div className="relative">
                                                     <Checkbox 
                                                         id={`task-${task.id}`} 
@@ -884,11 +1243,21 @@ export function Agenda() {
                                                         <Label htmlFor={`task-${task.id}`} className={cn('text-base md:text-lg transition-colors cursor-text break-words block', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
                                                             {task.text}
                                                         </Label>
-                                                        {task.details && (
-                                                            <span className="text-xs text-muted-foreground/70 flex items-center gap-1 mt-0.5">
-                                                                <NotepadText className="h-3 w-3" /> Has notes
-                                                            </span>
-                                                        )}
+                                                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                                            {task.dueDate && (
+                                                                <DueDateBadge 
+                                                                    dueDate={task.dueDate} 
+                                                                    showAbsolute={showAbsoluteTime[task.id] ?? false}
+                                                                    onClick={() => toggleTimeDisplay(task.id)}
+                                                                    completed={task.completed}
+                                                                />
+                                                            )}
+                                                            {task.details && (
+                                                                <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
+                                                                    <NotepadText className="h-3 w-3" /> Has notes
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )}
                                                 <div className="flex gap-0.5 md:gap-1 ml-auto shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -912,11 +1281,41 @@ export function Agenda() {
                                                 </div>
                                             </div>
                                             <CollapsibleContent>
+                                                {/* Task metadata: Created, Updated, and Due Date */}
+                                                <div className="px-3 md:px-4 pt-2 pb-3 border-t border-dashed space-y-2">
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3" />
+                                                            Created: {new Date(task.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" />
+                                                            Updated: {new Date(task.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                        </span>
+                                                        {task.dueDate && (
+                                                            <span className="flex items-center gap-1 ml-auto">
+                                                                <CalendarClock className="h-3 w-3" />
+                                                                Due: {new Date(task.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Due Date Editor */}
+                                                    <div className="flex items-center gap-2">
+                                                        <CalendarClock className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                        <span className="text-xs text-muted-foreground">Due:</span>
+                                                        <DueDateEditor 
+                                                            dueDate={task.dueDate}
+                                                            onSave={(date) => handleSetDueDate(task.id, date)}
+                                                            onRemove={() => handleRemoveDueDate(task.id)}
+                                                        />
+                                                    </div>
+                                                </div>
                                                 <TaskDetails task={task} onSave={(newDetails) => handleSaveDetails(task.id, newDetails)} />
                                             </CollapsibleContent>
                                         </Collapsible>
                                     </li>
-                                ))}
+                                    );
+                                })}
                                 {totalTasks === 0 && activeAgenda && (
                                     <div className="text-center py-16 flex flex-col justify-center items-center">
                                         <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
