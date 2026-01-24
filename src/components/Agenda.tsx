@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+
+const SOUND_ENABLED_KEY = 'streamAgenda_soundEnabled';
 import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
@@ -229,6 +231,9 @@ function AgendaList({
     setEditingAgendaName,
     onClose,
     isMobile,
+    sidebarWidth,
+    onResizeStart,
+    isResizing,
 }: {
     agendaGroups: AgendaGroup[];
     activeAgendaId: string | null;
@@ -247,6 +252,9 @@ function AgendaList({
     setEditingAgendaName: (name: string) => void;
     onClose?: () => void;
     isMobile?: boolean;
+    sidebarWidth?: number;
+    onResizeStart?: (e: React.MouseEvent) => void;
+    isResizing?: boolean;
 }) {
     // Drag and drop state for reordering agendas
     const [draggedAgendaId, setDraggedAgendaId] = useState<string | null>(null);
@@ -286,7 +294,34 @@ function AgendaList({
         }
     };
     return (
-        <aside className="w-72 flex flex-col border-r h-full bg-gradient-to-b from-card to-card/95">
+        <aside 
+            className="flex flex-col border-r h-full bg-gradient-to-b from-card to-card/95 relative"
+            style={{ width: isMobile ? '288px' : (sidebarWidth ?? 288) }}
+        >
+            {/* Resize handle - only show on desktop */}
+            {!isMobile && onResizeStart && (
+                <div
+                    className={cn(
+                        "absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 group",
+                        "hover:bg-primary/30 active:bg-primary/50 transition-colors",
+                        isResizing && "bg-primary/50"
+                    )}
+                    onMouseDown={onResizeStart}
+                    title="Drag to resize sidebar"
+                >
+                    <div className={cn(
+                        "absolute right-0 top-1/2 -translate-y-1/2 w-4 h-16 -mr-1.5 flex items-center justify-center",
+                        "opacity-0 group-hover:opacity-100 transition-opacity",
+                        isResizing && "opacity-100"
+                    )}>
+                        <div className="w-1 h-10 rounded-full bg-primary/40 flex flex-col items-center justify-center gap-1">
+                            <div className="w-0.5 h-1 rounded-full bg-primary" />
+                            <div className="w-0.5 h-1 rounded-full bg-primary" />
+                            <div className="w-0.5 h-1 rounded-full bg-primary" />
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="p-3 border-b bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -383,12 +418,12 @@ function AgendaList({
                                     variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} 
                                     onClick={() => handleAgendaSelect(agenda.id)} 
                                     className={cn(
-                                        "w-full justify-start h-auto py-2.5 px-3 gap-2 transition-all",
+                                        "w-full justify-start h-auto py-2.5 px-3 gap-2 transition-all items-start",
                                         activeAgendaId === agenda.id && "shadow-sm ring-1 ring-primary/20"
                                     )}
                                 >
                                     {/* Drag Handle */}
-                                    <GripVertical className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
+                                    <GripVertical className="h-4 w-4 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing shrink-0 mt-1" />
                                     <div className={cn(
                                         "h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors relative",
                                         activeAgendaId === agenda.id ? "bg-primary text-primary-foreground" : "bg-muted"
@@ -398,8 +433,8 @@ function AgendaList({
                                             <Pin className="h-3 w-3 absolute -top-1 -right-1 text-blue-500" />
                                         )}
                                     </div>
-                                    <div className="flex-1 text-left min-w-0">
-                                        <span className="truncate block font-medium">{agenda.name}</span>
+                                    <div className="flex-1 text-left min-w-0 overflow-hidden">
+                                        <span className="font-medium whitespace-normal break-words block" style={{ wordBreak: 'break-word' }}>{agenda.name}</span>
                                         {taskCount > 0 && (
                                             <span className="text-xs text-muted-foreground">
                                                 {completedCount}/{taskCount} completed
@@ -436,9 +471,9 @@ function AgendaList({
                             <CollapsibleContent className="space-y-1 mt-1">
                                 {agendaGroups.filter(a => a.archived).map(agenda => (
                                     <div key={agenda.id} className="relative group/item">
-                                        <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => handleAgendaSelect(agenda.id)} className="w-full justify-start h-10 gap-2 opacity-70">
-                                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                                            <span className="truncate flex-1 text-left">{agenda.name}</span>
+                                        <Button variant={activeAgendaId === agenda.id ? "secondary" : "ghost"} onClick={() => handleAgendaSelect(agenda.id)} className="w-full justify-start h-auto min-h-10 py-2 gap-2 opacity-70 items-start">
+                                            <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                                            <span className="flex-1 text-left whitespace-normal break-words" style={{ wordBreak: 'break-word' }}>{agenda.name}</span>
                                             <DropdownMenuForAgenda
                                                 onRename={() => {
                                                     setEditingAgendaId(agenda.id);
@@ -641,6 +676,78 @@ export function Agenda() {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isPresentationMode, setIsPresentationMode] = useState(false);
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+    const [recentlyCompletedTaskId, setRecentlyCompletedTaskId] = useState<string | null>(null);
+    
+    // Play completion sound using Web Audio API
+    const playCompletionSound = useCallback(() => {
+        // Check if sound is enabled
+        const soundEnabled = localStorage.getItem(SOUND_ENABLED_KEY)
+        if (soundEnabled === 'false') return
+        
+        try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            
+            // Create a soft, gentle "pop" sound
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Soft, low frequency for a gentle pop
+            oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+            oscillator.type = 'sine';
+            
+            // Very quick, soft envelope
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.15, audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.15);
+        } catch (e) {
+            // Audio not supported, fail silently
+        }
+    }, []);
+    
+    // Sidebar resize state
+    const [sidebarWidth, setSidebarWidth] = useState(288); // Default 288px (w-72)
+    const [isResizing, setIsResizing] = useState(false);
+    const minSidebarWidth = 200;
+    const maxSidebarWidth = 500;
+
+    // Handle sidebar resize
+    const handleResizeStart = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isResizing) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const newWidth = Math.min(maxSidebarWidth, Math.max(minSidebarWidth, e.clientX));
+            setSidebarWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            // Save sidebar width to localStorage
+            localStorage.setItem('sidebarWidth', String(sidebarWidth));
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    }, [isResizing, sidebarWidth]);
 
     useEffect(() => {
         setIsClient(true);
@@ -650,6 +757,15 @@ export function Agenda() {
     useEffect(() => {
         if (!isClient) return;
         try {
+            // Load sidebar width
+            const savedSidebarWidth = localStorage.getItem('sidebarWidth');
+            if (savedSidebarWidth) {
+                const width = parseInt(savedSidebarWidth, 10);
+                if (width >= minSidebarWidth && width <= maxSidebarWidth) {
+                    setSidebarWidth(width);
+                }
+            }
+            
             const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
@@ -749,8 +865,19 @@ export function Agenda() {
 
     const handleToggleTask = (id: string) => {
         if (!activeAgenda) return;
+        const task = activeAgenda.tasks.find(t => t.id === id);
+        const isCompleting = task && !task.completed;
+        
         const now = new Date().toISOString();
         updateTasksForActiveAgenda(activeAgenda.tasks.map(task => task.id === id ? { ...task, completed: !task.completed, updatedAt: now } : task));
+        
+        // Play sound and trigger animation when completing (not uncompleting)
+        if (isCompleting) {
+            playCompletionSound();
+            setRecentlyCompletedTaskId(id);
+            // Clear the animation state after animation completes
+            setTimeout(() => setRecentlyCompletedTaskId(null), 600);
+        }
     };
 
     const handleStartEdit = (task: Task) => {
@@ -1066,7 +1193,7 @@ export function Agenda() {
             )}
             
             {/* Desktop sidebar */}
-            <div className="hidden md:block">
+            <div className="hidden md:block h-full">
                 <AgendaList
                     agendaGroups={agendaGroups}
                     activeAgendaId={activeAgendaId}
@@ -1083,6 +1210,9 @@ export function Agenda() {
                     setEditingAgendaId={setEditingAgendaId}
                     editingAgendaName={editingAgendaName}
                     setEditingAgendaName={setEditingAgendaName}
+                    sidebarWidth={sidebarWidth}
+                    onResizeStart={handleResizeStart}
+                    isResizing={isResizing}
                 />
             </div>
             
@@ -1196,7 +1326,8 @@ export function Agenda() {
                                             isOverdue && "border-l-4 border-l-red-500 bg-red-500/5",
                                             isUrgent && !isOverdue && "border-l-4 border-l-orange-500 bg-orange-500/5",
                                             draggedTaskId === task.id && "opacity-50 scale-[0.98]",
-                                            dragOverTaskId === task.id && "ring-2 ring-primary ring-offset-2"
+                                            dragOverTaskId === task.id && "ring-2 ring-primary ring-offset-2",
+                                            recentlyCompletedTaskId === task.id && "animate-task-complete"
                                         )}
                                         style={{ animationDelay: `${index * 50}ms` }}
                                     >
@@ -1212,7 +1343,10 @@ export function Agenda() {
                                                 >
                                                     <GripVertical className="h-4 w-4 md:h-5 md:w-5" />
                                                 </div>
-                                                <div className="relative">
+                                                <div className={cn(
+                                                    "relative",
+                                                    recentlyCompletedTaskId === task.id && "animate-checkbox-pop"
+                                                )}>
                                                     <Checkbox 
                                                         id={`task-${task.id}`} 
                                                         checked={task.completed} 
@@ -1223,7 +1357,20 @@ export function Agenda() {
                                                         )} 
                                                     />
                                                     {task.completed && (
-                                                        <CheckCircle2 className="absolute inset-0 h-5 w-5 md:h-6 md:w-6 text-green-500 pointer-events-none" />
+                                                        <CheckCircle2 className={cn(
+                                                            "absolute inset-0 h-5 w-5 md:h-6 md:w-6 text-green-500 pointer-events-none",
+                                                            recentlyCompletedTaskId === task.id && "animate-checkmark"
+                                                        )} />
+                                                    )}
+                                                    {/* Celebration particles */}
+                                                    {recentlyCompletedTaskId === task.id && (
+                                                        <>
+                                                            <span className="absolute inset-0 animate-ping-once rounded-full bg-green-400/50" />
+                                                            <span className="absolute -top-1 -left-1 w-2 h-2 bg-green-400 rounded-full animate-particle-1" />
+                                                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-particle-2" />
+                                                            <span className="absolute -bottom-1 -left-1 w-1.5 h-1.5 bg-teal-400 rounded-full animate-particle-3" />
+                                                            <span className="absolute -bottom-1 -right-1 w-1.5 h-1.5 bg-green-300 rounded-full animate-particle-4" />
+                                                        </>
                                                     )}
                                                 </div>
                                                 {editingTaskId === task.id ? (

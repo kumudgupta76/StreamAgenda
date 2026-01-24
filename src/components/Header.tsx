@@ -2,6 +2,7 @@
 
 import { Presentation } from 'lucide-react';
 import { ThemeSwitcher } from '@/components/theme-switcher';
+import { SoundToggle } from '@/components/sound-toggle';
 
 export function Header() {
   return (
@@ -11,7 +12,10 @@ export function Header() {
           <Presentation className="h-7 w-7 text-primary" />
           <h1 className="text-2xl font-bold font-headline tracking-tight">Task Buddy</h1>
         </div>
-        <ThemeSwitcher />
+        <div className="flex items-center gap-1">
+          <SoundToggle />
+          <ThemeSwitcher />
+        </div>
       </div>
     </header>
   );
