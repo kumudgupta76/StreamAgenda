@@ -529,7 +529,7 @@ function DropdownMenuForAgenda({ onRename, onDelete, onArchive, onPin, disabled,
 function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) => void }) {
     const [details, setDetails] = useState(task.details);
     const [isSaving, setIsSaving] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
+    const [showPreview, setShowPreview] = useState(true);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -638,6 +638,7 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
                         {hasContent ? (
                             <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                    a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                                     input: ({...props}) => {
                                         if(props.type === 'checkbox') {
                                             return <Checkbox checked={props.checked} disabled className="mr-1.5" />
@@ -1141,7 +1142,9 @@ export function Agenda() {
                                                     </div>
                                                     {task.details && (
                                                         <div className="mt-2 text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
-                                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                                                a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                                                            }}>
                                                                 {task.details}
                                                             </ReactMarkdown>
                                                         </div>
