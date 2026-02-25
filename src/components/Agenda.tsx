@@ -1058,9 +1058,9 @@ export function Agenda() {
     if (!isClient) {
         // Render a placeholder or loading state on the server
         return (
-            <div className="flex-1 flex overflow-hidden">
-                <aside className="hidden md:flex w-64 flex-col border-r h-full bg-card" />
-                <main className="flex-1 flex flex-col h-full" />
+            <div className="flex flex-1 overflow-hidden">
+                <aside className="hidden md:flex shrink-0 w-72 flex-col border-r h-full bg-card" />
+                <main className="flex-1 flex flex-col h-full min-w-0" />
             </div>
         )
     }
@@ -1196,7 +1196,7 @@ export function Agenda() {
             )}
             
             {/* Desktop sidebar */}
-            <div className="hidden md:block h-full">
+            <div className="hidden md:flex shrink-0 h-full">
                 <AgendaList
                     agendaGroups={agendaGroups}
                     activeAgendaId={activeAgendaId}
@@ -1245,7 +1245,7 @@ export function Agenda() {
                 />
             </div>
             
-            <main className="flex-1 flex flex-col h-full bg-gradient-to-br from-background to-muted/20" style={{overflow:"auto"}}>
+            <main className="flex-1 flex flex-col h-full min-w-0 bg-gradient-to-br from-background to-muted/20" style={{overflow:"auto"}}>
                 <Card className="flex-1 flex flex-col shadow-none border-none bg-transparent rounded-none">
                     <CardHeader className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
                         <div className="flex items-center gap-3">
