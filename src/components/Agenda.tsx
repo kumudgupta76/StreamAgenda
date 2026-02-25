@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 
 interface Task {
@@ -130,6 +140,182 @@ function DueDateBadge({ dueDate, showAbsolute, onClick, completed }: { dueDate: 
       {isOverdue ? <AlertTriangle className="h-3 w-3" /> : <CalendarClock className="h-3 w-3" />}
       {showAbsolute ? absoluteText : text}
     </button>
+  );
+}
+
+// JSON Editor Dialog Component
+function JsonEditorDialog({ tasks, onSave, trigger }: { tasks: Task[]; onSave: (tasks: Task[]) => void; trigger: React.ReactNode }) {
+  const [jsonText, setJsonText] = useState('');
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // When dialog opens, populate with current tasks
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      // Serialize tasks to clean JSON (only user-relevant fields)
+      const cleanTasks = tasks.map(t => ({
+        text: t.text,
+        details: t.details,
+        completed: t.completed,
+        dueDate: t.dueDate || undefined,
+      }));
+      setJsonText(JSON.stringify(cleanTasks, null, 2));
+      setJsonError(null);
+    }
+  };
+
+  const validateAndParse = (text: string): { valid: boolean; tasks?: Task[]; error?: string } => {
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        return { valid: false, error: 'JSON must be an array of tasks.' };
+      }
+      const now = new Date().toISOString();
+      const validatedTasks: Task[] = parsed.map((item: any, index: number) => {
+        if (typeof item.text !== 'string' || !item.text.trim()) {
+          throw new Error(`Task at index ${index} must have a non-empty "text" field.`);
+        }
+        return {
+          id: item.id && typeof item.id === 'string' ? item.id : crypto.randomUUID(),
+          text: item.text.trim(),
+          details: typeof item.details === 'string' ? item.details : '',
+          completed: typeof item.completed === 'boolean' ? item.completed : false,
+          createdAt: item.createdAt || now,
+          updatedAt: now,
+          dueDate: item.dueDate || undefined,
+        };
+      });
+      return { valid: true, tasks: validatedTasks };
+    } catch (e: any) {
+      return { valid: false, error: e.message || 'Invalid JSON.' };
+    }
+  };
+
+  const handleSave = () => {
+    const result = validateAndParse(jsonText);
+    if (result.valid && result.tasks) {
+      onSave(result.tasks);
+      setIsOpen(false);
+    } else {
+      setJsonError(result.error || 'Invalid JSON.');
+    }
+  };
+
+  const handleTextChange = (value: string) => {
+    setJsonText(value);
+    if (jsonError) {
+      // Clear error when user types
+      setJsonError(null);
+    }
+  };
+
+  const handleCopyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(jsonText);
+    } catch (e) {
+      // fallback
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setJsonText(text);
+      setJsonError(null);
+    } catch (e) {
+      // fallback
+    }
+  };
+
+  const handleFormatJson = () => {
+    try {
+      const parsed = JSON.parse(jsonText);
+      setJsonText(JSON.stringify(parsed, null, 2));
+      setJsonError(null);
+    } catch (e: any) {
+      setJsonError(e.message || 'Cannot format: invalid JSON.');
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        {trigger}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Braces className="h-5 w-5 text-primary" />
+            Edit Tasks as JSON
+          </DialogTitle>
+          <DialogDescription>
+            Edit your tasks directly as JSON. Each task needs at least a <code className="bg-muted px-1 rounded text-xs">"text"</code> field. 
+            You can paste a large list to bulk-add tasks.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleCopyToClipboard} className="h-7 text-xs gap-1">
+            <Copy className="h-3 w-3" /> Copy
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePasteFromClipboard} className="h-7 text-xs gap-1">
+            <ClipboardPaste className="h-3 w-3" /> Paste
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleFormatJson} className="h-7 text-xs gap-1">
+            <Braces className="h-3 w-3" /> Format
+          </Button>
+          <span className="text-xs text-muted-foreground ml-auto">
+            {(() => {
+              try {
+                const parsed = JSON.parse(jsonText);
+                return Array.isArray(parsed) ? `${parsed.length} task${parsed.length !== 1 ? 's' : ''}` : '';
+              } catch { return ''; }
+            })()}
+          </span>
+        </div>
+
+        {/* Error display */}
+        {jsonError && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>{jsonError}</span>
+          </div>
+        )}
+
+        {/* JSON Editor */}
+        <div className="flex-1 min-h-0">
+          <Textarea
+            ref={textareaRef}
+            value={jsonText}
+            onChange={(e) => handleTextChange(e.target.value)}
+            className={cn(
+              "font-mono text-sm min-h-[300px] max-h-[50vh] resize-none transition-colors",
+              jsonError && "border-destructive focus-visible:ring-destructive/50"
+            )}
+            spellCheck={false}
+            placeholder={`[\n  {\n    "text": "My task",\n    "details": "Optional notes",\n    "completed": false,\n    "dueDate": "2026-03-01T10:00:00.000Z"\n  }\n]`}
+          />
+        </div>
+
+        {/* Schema hint */}
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer hover:text-foreground transition-colors">JSON Schema Reference</summary>
+          <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto text-[11px] leading-relaxed">{`{\n  "text": "string (required)",\n  "details": "string (optional, supports markdown)",\n  "completed": "boolean (optional, default: false)",\n  "dueDate": "ISO date string (optional)"\n}`}</pre>
+        </details>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button onClick={handleSave} className="gap-1">
+            <Save className="h-4 w-4" /> Save Tasks
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1274,16 +1460,33 @@ export function Agenda() {
                                 )}
                             </div>
                             {activeAgenda && (
-                                <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => setIsPresentationMode(true)}
-                                    className="shrink-0 gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
-                                    aria-label="Present agenda"
-                                >
-                                    <Presentation className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Present</span>
-                                </Button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <JsonEditorDialog
+                                        tasks={activeAgenda.tasks}
+                                        onSave={(newTasks) => updateTasksForActiveAgenda(newTasks)}
+                                        trigger={
+                                            <Button 
+                                                variant="outline" 
+                                                size="sm"
+                                                className="gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
+                                                aria-label="Edit tasks as JSON"
+                                            >
+                                                <Braces className="h-4 w-4" />
+                                                <span className="hidden sm:inline">JSON</span>
+                                            </Button>
+                                        }
+                                    />
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => setIsPresentationMode(true)}
+                                        className="gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
+                                        aria-label="Present agenda"
+                                    >
+                                        <Presentation className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Present</span>
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </CardHeader>
