@@ -219,3 +219,97 @@
 .animate-particle-4 {
   animation: particle-4 0.5s ease-out 0.15s forwards;
 }
+
+/* ==========================================
+   Presentation transition animations
+   ========================================== */
+
+/* --- Stack (3D depth with swing) --- */
+@keyframes stack-enter-right {
+  0% { opacity: 0; transform: translateX(80px) translateY(20px) scale(0.92) rotateY(-8deg); }
+  60% { opacity: 1; transform: translateX(-8px) translateY(-2px) scale(1.01) rotateY(1deg); }
+  100% { opacity: 1; transform: translateX(0) translateY(0) scale(1) rotateY(0deg); }
+}
+@keyframes stack-enter-left {
+  0% { opacity: 0; transform: translateX(-80px) translateY(20px) scale(0.92) rotateY(8deg); }
+  60% { opacity: 1; transform: translateX(8px) translateY(-2px) scale(1.01) rotateY(-1deg); }
+  100% { opacity: 1; transform: translateX(0) translateY(0) scale(1) rotateY(0deg); }
+}
+.animate-stack-enter-right { animation: stack-enter-right 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-stack-enter-left  { animation: stack-enter-left  0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* --- Flip (3D card flip) --- */
+@keyframes flip-enter-right {
+  0% { opacity: 0; transform: rotateY(-90deg) scale(0.9); }
+  50% { opacity: 1; }
+  100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+@keyframes flip-enter-left {
+  0% { opacity: 0; transform: rotateY(90deg) scale(0.9); }
+  50% { opacity: 1; }
+  100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+.animate-flip-enter-right { animation: flip-enter-right 0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+.animate-flip-enter-left  { animation: flip-enter-left  0.6s cubic-bezier(0.23, 1, 0.32, 1); }
+
+/* --- Slide (smooth horizontal slide) --- */
+@keyframes slide-enter-right {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-enter-left {
+  0% { opacity: 0; transform: translateX(-100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-enter-right { animation: slide-enter-right 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-slide-enter-left  { animation: slide-enter-left  0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* --- Fade (crossfade) --- */
+@keyframes fade-enter {
+  0% { opacity: 0; transform: scale(0.97); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-fade-enter { animation: fade-enter 0.5s ease-out; }
+
+/* --- Zoom (zoom in from center with direction) --- */
+@keyframes zoom-enter-right {
+  0% { opacity: 0; transform: scale(0.3) translateX(40px); }
+  70% { opacity: 1; transform: scale(1.04) translateX(-4px); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
+@keyframes zoom-enter-left {
+  0% { opacity: 0; transform: scale(0.3) translateX(-40px); }
+  70% { opacity: 1; transform: scale(1.04) translateX(4px); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
+.animate-zoom-enter-right { animation: zoom-enter-right 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-zoom-enter-left  { animation: zoom-enter-left  0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* --- List mode entry animations --- */
+@keyframes list-stack-enter {
+  0% { opacity: 0; transform: translateY(40px) scale(0.95) rotateX(4deg); }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotateX(0); }
+}
+@keyframes list-flip-enter {
+  0% { opacity: 0; transform: rotateX(-80deg) scale(0.9); }
+  50% { opacity: 1; }
+  100% { opacity: 1; transform: rotateX(0) scale(1); }
+}
+@keyframes list-slide-enter {
+  0% { opacity: 0; transform: translateX(-60px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes list-fade-enter {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes list-zoom-enter {
+  0% { opacity: 0; transform: scale(0.5); }
+  70% { transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.animate-list-stack { animation: list-stack-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-list-flip  { animation: list-flip-enter  0.7s cubic-bezier(0.23, 1, 0.32, 1); transform-origin: top center; }
+.animate-list-slide { animation: list-slide-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-list-fade  { animation: list-fade-enter  0.6s ease-out; }
+.animate-list-zoom  { animation: list-zoom-enter  0.5s cubic-bezier(0.16, 1, 0.3, 1); }

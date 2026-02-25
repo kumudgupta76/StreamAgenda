@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -862,6 +862,10 @@ export function Agenda() {
     const [isClient, setIsClient] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isPresentationMode, setIsPresentationMode] = useState(false);
+    const [presentationSlideIndex, setPresentationSlideIndex] = useState(0);
+    const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+    const [presentationStyle, setPresentationStyle] = useState<'list' | 'slideshow'>('list');
+    const [presentationAnimation, setPresentationAnimation] = useState<'stack' | 'flip' | 'fade' | 'slide' | 'zoom'>('stack');
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
     const [recentlyCompletedTaskId, setRecentlyCompletedTaskId] = useState<string | null>(null);
     
@@ -1004,6 +1008,25 @@ export function Agenda() {
 
     const activeAgenda = useMemo(() => agendaGroups.find(agenda => agenda.id === activeAgendaId), [agendaGroups, activeAgendaId]);
 
+    // Auto-detect presentation style based on whether tasks have details
+    const hasTasksWithDetails = useMemo(() => {
+        if (!activeAgenda) return false;
+        return activeAgenda.tasks.some(t => t.details && t.details.trim().length > 0);
+    }, [activeAgenda]);
+
+    // When entering presentation mode, auto-pick style and reset slide
+    const enterPresentationMode = useCallback((forceStyle?: 'list' | 'slideshow') => {
+        setPresentationSlideIndex(0);
+        setSlideDirection('right');
+        setPresentationStyle(forceStyle ?? (hasTasksWithDetails ? 'slideshow' : 'list'));
+        setIsPresentationMode(true);
+    }, [hasTasksWithDetails]);
+
+    const goToSlide = useCallback((index: number, direction: 'left' | 'right') => {
+        setSlideDirection(direction);
+        setPresentationSlideIndex(index);
+    }, []);
+
     // Keyboard navigation for presentation mode
     useEffect(() => {
         if (!isPresentationMode) return;
@@ -1013,11 +1036,40 @@ export function Agenda() {
                 e.preventDefault();
                 setIsPresentationMode(false);
             }
+            if (presentationStyle === 'slideshow' && activeAgenda) {
+                const maxIndex = activeAgenda.tasks.length - 1;
+                if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                    e.preventDefault();
+                    setPresentationSlideIndex(prev => {
+                        const next = Math.min(prev + 1, maxIndex);
+                        setSlideDirection('right');
+                        return next;
+                    });
+                }
+                if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                    e.preventDefault();
+                    setPresentationSlideIndex(prev => {
+                        const next = Math.max(prev - 1, 0);
+                        setSlideDirection('left');
+                        return next;
+                    });
+                }
+                if (e.key === 'Home') {
+                    e.preventDefault();
+                    setSlideDirection('left');
+                    setPresentationSlideIndex(0);
+                }
+                if (e.key === 'End') {
+                    e.preventDefault();
+                    setSlideDirection('right');
+                    setPresentationSlideIndex(maxIndex);
+                }
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPresentationMode]);
+    }, [isPresentationMode, presentationStyle, activeAgenda]);
 
     const updateTasksForActiveAgenda = (newTasks: Task[]) => {
         if (!activeAgendaId) return;
@@ -1256,119 +1308,406 @@ export function Agenda() {
             {/* Presentation Mode Overlay */}
             {isPresentationMode && activeAgenda && (
                 <div className="fixed inset-0 z-[100] bg-gradient-to-br from-background via-background to-muted/30 flex flex-col animate-in fade-in duration-300">
-                    {/* Exit Button - floating */}
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setIsPresentationMode(false)}
-                        className="absolute top-4 right-4 gap-1 bg-background/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 z-10"
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
+                    {/* Top Bar - floating controls */}
+                    <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+                        {/* Style toggle */}
+                        <div className="flex items-center rounded-lg border bg-background/80 backdrop-blur-sm overflow-hidden">
+                            <button
+                                onClick={() => { setPresentationStyle('list'); setPresentationSlideIndex(0); }}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                                    presentationStyle === 'list' ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                                )}
+                                title="List view"
+                            >
+                                <LayoutList className="h-3.5 w-3.5" /> List
+                            </button>
+                            <button
+                                onClick={() => { setPresentationStyle('slideshow'); setPresentationSlideIndex(0); }}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                                    presentationStyle === 'slideshow' ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                                )}
+                                title="Slideshow view"
+                            >
+                                <GalleryHorizontalEnd className="h-3.5 w-3.5" /> Cards
+                            </button>
+                        </div>
+                        {/* Animation picker buttons */}
+                        <div className="flex items-center rounded-lg border bg-background/80 backdrop-blur-sm overflow-hidden">
+                            {([
+                                { value: 'stack' as const, label: 'Stack', icon: Layers },
+                                { value: 'flip' as const, label: 'Flip', icon: FlipVertical },
+                                { value: 'slide' as const, label: 'Slide', icon: SlidersHorizontal },
+                                { value: 'fade' as const, label: 'Fade', icon: Sparkles },
+                                { value: 'zoom' as const, label: 'Zoom', icon: ZoomIn },
+                            ]).map(anim => (
+                                <button
+                                    key={anim.value}
+                                    onClick={() => setPresentationAnimation(anim.value)}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors",
+                                        presentationAnimation === anim.value
+                                            ? "bg-primary text-primary-foreground"
+                                            : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    )}
+                                    title={`${anim.label} animation`}
+                                >
+                                    <anim.icon className="h-3.5 w-3.5" />
+                                    <span className="hidden lg:inline">{anim.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setIsPresentationMode(false)}
+                            className="gap-1 bg-background/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
 
-                    {/* Single Slide Content */}
-                    <div className="flex-1 flex items-center justify-center p-6 md:p-12 overflow-auto">
-                        <div className="w-full max-w-5xl bg-card rounded-2xl shadow-2xl border flex flex-col overflow-hidden">
-                            {/* Slide Header */}
-                            <div className="px-6 py-4 md:px-8 md:py-5 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-b">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                        <Presentation className="h-5 w-5 text-primary" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h1 className="text-lg md:text-xl font-bold text-foreground leading-tight truncate">
-                                            {activeAgenda.name}
-                                        </h1>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-muted-foreground text-xs md:text-sm shrink-0">
-                                        <span>{completedTasks}/{activeAgenda.tasks.length}</span>
-                                        <span>completed</span>
+                    {/* ===== LIST MODE (original) ===== */}
+                    {presentationStyle === 'list' && (
+                        <div className="flex-1 flex items-center justify-center p-6 md:p-12 overflow-auto" style={{ perspective: presentationAnimation === 'flip' ? '1200px' : undefined }}>
+                            <div className={cn(
+                                "w-full max-w-5xl bg-card rounded-2xl shadow-2xl border flex flex-col overflow-hidden",
+                                `animate-list-${presentationAnimation}`
+                            )}>
+                                {/* Slide Header */}
+                                <div className="px-6 py-4 md:px-8 md:py-5 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-b">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <Presentation className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h1 className="text-lg md:text-xl font-bold text-foreground leading-tight truncate">
+                                                {activeAgenda.name}
+                                            </h1>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-muted-foreground text-xs md:text-sm shrink-0">
+                                            <span>{completedTasks}/{activeAgenda.tasks.length}</span>
+                                            <span>completed</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Tasks List */}
-                            <div className="flex-1 p-6 md:p-10 overflow-auto max-h-[60vh]">
-                                {activeAgenda.tasks.length > 0 ? (
-                                    <ul className="space-y-4">
-                                        {activeAgenda.tasks.map((task, index) => (
-                                            <li 
-                                                key={task.id}
-                                                className={cn(
-                                                    "flex items-start gap-4 p-4 rounded-xl border transition-all",
-                                                    task.completed 
-                                                        ? "bg-primary/5 border-primary/20 opacity-70" 
-                                                        : "bg-muted/30 border-transparent hover:border-primary/20"
-                                                )}
-                                            >
-                                                <button
-                                                    onClick={() => handleToggleTask(task.id)}
+                                {/* Tasks List */}
+                                <div className="flex-1 p-6 md:p-10 overflow-auto max-h-[60vh]">
+                                    {activeAgenda.tasks.length > 0 ? (
+                                        <ul className="space-y-4">
+                                            {activeAgenda.tasks.map((task, index) => (
+                                                <li 
+                                                    key={task.id}
                                                     className={cn(
-                                                        "flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-0.5 transition-all",
+                                                        "flex items-start gap-4 p-4 rounded-xl border transition-all",
                                                         task.completed 
-                                                            ? "bg-primary text-primary-foreground" 
-                                                            : "bg-primary/10 text-primary hover:bg-primary/20"
+                                                            ? "bg-primary/5 border-primary/20 opacity-70" 
+                                                            : "bg-muted/30 border-transparent hover:border-primary/20"
                                                     )}
-                                                    aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
                                                 >
-                                                    {task.completed ? (
-                                                        <CheckCircle2 className="h-5 w-5" />
-                                                    ) : (
-                                                        <span className="font-bold text-sm">{index + 1}</span>
-                                                    )}
-                                                </button>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={cn(
-                                                            "text-lg md:text-xl font-medium",
-                                                            task.completed && "text-muted-foreground"
-                                                        )}>
-                                                            {task.text}
-                                                        </span>
-                                                    </div>
-                                                    {task.details && (
-                                                        <div className="mt-2 text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
-                                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                                                                a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
-                                                            }}>
-                                                                {task.details}
-                                                            </ReactMarkdown>
+                                                    <button
+                                                        onClick={() => handleToggleTask(task.id)}
+                                                        className={cn(
+                                                            "flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-0.5 transition-all",
+                                                            task.completed 
+                                                                ? "bg-primary text-primary-foreground" 
+                                                                : "bg-primary/10 text-primary hover:bg-primary/20"
+                                                        )}
+                                                        aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                                                    >
+                                                        {task.completed ? (
+                                                            <CheckCircle2 className="h-5 w-5" />
+                                                        ) : (
+                                                            <span className="font-bold text-sm">{index + 1}</span>
+                                                        )}
+                                                    </button>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={cn(
+                                                                "text-lg md:text-xl font-medium",
+                                                                task.completed && "text-muted-foreground"
+                                                            )}>
+                                                                {task.text}
+                                                            </span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="text-center py-12 text-muted-foreground">
-                                        <p className="text-lg">No items in this agenda</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Slide Footer */}
-                            <div className="px-8 py-4 border-t bg-muted/30 flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">
-                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                                </span>
-                                <div className="flex items-center gap-2 text-sm font-medium">
-                                    {completedTasks === totalTasks && totalTasks > 0 ? (
-                                        <span className="text-primary flex items-center gap-1">
-                                            <CheckCircle2 className="h-4 w-4" /> All items completed!
-                                        </span>
+                                                        {task.details && (
+                                                            <div className="mt-2 text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
+                                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                                                    a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                                                                }}>
+                                                                    {task.details}
+                                                                </ReactMarkdown>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     ) : (
-                                        <span className="text-muted-foreground">
-                                            {completedTasks} of {totalTasks} completed
-                                        </span>
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            <p className="text-lg">No items in this agenda</p>
+                                        </div>
                                     )}
+                                </div>
+
+                                {/* Slide Footer */}
+                                <div className="px-8 py-4 border-t bg-muted/30 flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">
+                                        {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                    </span>
+                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                        {completedTasks === totalTasks && totalTasks > 0 ? (
+                                            <span className="text-primary flex items-center gap-1">
+                                                <CheckCircle2 className="h-4 w-4" /> All items completed!
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                {completedTasks} of {totalTasks} completed
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* ===== SLIDESHOW MODE (stacked cards like PPT) ===== */}
+                    {presentationStyle === 'slideshow' && activeAgenda.tasks.length > 0 && (() => {
+                        const tasks = activeAgenda.tasks;
+                        const currentIndex = presentationSlideIndex;
+                        const isFirst = currentIndex === 0;
+                        const isLast = currentIndex === tasks.length - 1;
+
+                        // Render up to 2 cards behind + current + 2 ahead for depth stack
+                        const visibleRange = [-2, -1, 0, 1, 2];
+
+                        return (
+                            <>
+                                {/* Navigation arrows — side of screen */}
+                                <button
+                                    onClick={() => goToSlide(currentIndex - 1, 'left')}
+                                    disabled={isFirst}
+                                    className={cn(
+                                        "absolute left-4 md:left-8 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full flex items-center justify-center transition-all",
+                                        "bg-background/80 backdrop-blur-sm border shadow-lg hover:bg-primary/10 hover:border-primary/30",
+                                        isFirst && "opacity-30 cursor-not-allowed hover:bg-background/80 hover:border-border"
+                                    )}
+                                    aria-label="Previous slide"
+                                >
+                                    <ChevronLeft className="h-6 w-6" />
+                                </button>
+                                <button
+                                    onClick={() => goToSlide(currentIndex + 1, 'right')}
+                                    disabled={isLast}
+                                    className={cn(
+                                        "absolute right-4 md:right-8 top-1/2 -translate-y-1/2 z-20 h-12 w-12 rounded-full flex items-center justify-center transition-all",
+                                        "bg-background/80 backdrop-blur-sm border shadow-lg hover:bg-primary/10 hover:border-primary/30",
+                                        isLast && "opacity-30 cursor-not-allowed hover:bg-background/80 hover:border-border"
+                                    )}
+                                    aria-label="Next slide"
+                                >
+                                    <ChevronRight className="h-6 w-6" />
+                                </button>
+
+                                {/* Stacked cards container */}
+                                <div className="flex-1 flex items-center justify-center px-16 md:px-24 py-6 md:py-12 overflow-hidden" style={{ perspective: '1200px' }}>
+                                    <div className="relative w-full max-w-4xl" style={{ height: '70vh', maxHeight: '700px' }}>
+                                        {(presentationAnimation === 'stack' ? visibleRange : [0]).map(offset => {
+                                            const taskIndex = currentIndex + offset;
+                                            if (taskIndex < 0 || taskIndex >= tasks.length) return null;
+                                            const task = tasks[taskIndex];
+                                            const absOffset = Math.abs(offset);
+
+                                            // Stack positioning: cards behind go up & shrink, cards ahead go down & shrink
+                                            const translateY = offset * -18;
+                                            const scale = 1 - absOffset * 0.06;
+                                            const zIndex = 10 - absOffset;
+                                            const opacity = offset === 0 ? 1 : absOffset === 1 ? 0.55 : 0.25;
+                                            const blur = absOffset >= 2 ? 2 : absOffset === 1 ? 1 : 0;
+                                            const rotateX = offset * 1.5;
+
+                                            // Choose animation class for the current (front) card
+                                            const getAnimationClass = () => {
+                                                if (offset !== 0) return '';
+                                                const dir = slideDirection;
+                                                switch (presentationAnimation) {
+                                                    case 'stack': return dir === 'right' ? 'animate-stack-enter-right' : 'animate-stack-enter-left';
+                                                    case 'flip': return dir === 'right' ? 'animate-flip-enter-right' : 'animate-flip-enter-left';
+                                                    case 'slide': return dir === 'right' ? 'animate-slide-enter-right' : 'animate-slide-enter-left';
+                                                    case 'fade': return 'animate-fade-enter';
+                                                    case 'zoom': return dir === 'right' ? 'animate-zoom-enter-right' : 'animate-zoom-enter-left';
+                                                    default: return '';
+                                                }
+                                            };
+
+                                            return (
+                                                <div
+                                                    key={task.id + '-stack-' + offset}
+                                                    className={cn(
+                                                        "absolute inset-0 rounded-2xl border bg-card flex flex-col overflow-hidden transition-all duration-500 ease-out",
+                                                        offset === 0 ? "shadow-2xl cursor-default" : "shadow-lg pointer-events-none",
+                                                        getAnimationClass()
+                                                    )}
+                                                    style={presentationAnimation === 'stack' ? {
+                                                        transform: `translateY(${translateY}px) scale(${scale}) rotateX(${rotateX}deg)`,
+                                                        zIndex,
+                                                        opacity: offset === 0 ? undefined : opacity,
+                                                        filter: blur > 0 ? `blur(${blur}px)` : undefined,
+                                                        transformOrigin: 'center center',
+                                                    } : {
+                                                        transformOrigin: presentationAnimation === 'flip' ? (slideDirection === 'right' ? 'right center' : 'left center') : 'center center',
+                                                    }}
+                                                >
+                                                    {/* Only render full content for current card; behind cards show header teaser */}
+                                                    {offset === 0 ? (
+                                                        <>
+                                                            {/* Card Header */}
+                                                            <div className="px-6 py-4 md:px-10 md:py-6 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 border-b shrink-0">
+                                                                <div className="flex items-center gap-4">
+                                                                    <button
+                                                                        onClick={() => handleToggleTask(task.id)}
+                                                                        className={cn(
+                                                                            "flex items-center justify-center h-12 w-12 rounded-full shrink-0 transition-all text-lg font-bold",
+                                                                            task.completed
+                                                                                ? "bg-primary text-primary-foreground"
+                                                                                : "bg-primary/10 text-primary hover:bg-primary/20"
+                                                                        )}
+                                                                        aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                                                                    >
+                                                                        {task.completed ? (
+                                                                            <CheckCircle2 className="h-7 w-7" />
+                                                                        ) : (
+                                                                            <span>{currentIndex + 1}</span>
+                                                                        )}
+                                                                    </button>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <h2 className={cn(
+                                                                            "text-xl md:text-3xl font-bold leading-tight",
+                                                                            task.completed && "line-through text-muted-foreground"
+                                                                        )}>
+                                                                            {task.text}
+                                                                        </h2>
+                                                                        {task.dueDate && (
+                                                                            <div className="mt-2">
+                                                                                <DueDateBadge
+                                                                                    dueDate={task.dueDate}
+                                                                                    showAbsolute={false}
+                                                                                    onClick={() => {}}
+                                                                                    completed={task.completed}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Card Body */}
+                                                            <div className="flex-1 p-6 md:p-10 overflow-auto">
+                                                                {task.details ? (
+                                                                    <div className="prose prose-base md:prose-lg dark:prose-invert max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0">
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                                                            a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" />,
+                                                                            input: ({...props}) => {
+                                                                                if(props.type === 'checkbox') {
+                                                                                    return <Checkbox checked={props.checked} disabled className="mr-1.5" />
+                                                                                }
+                                                                                return <input {...props} />
+                                                                            }
+                                                                        }}>
+                                                                            {task.details}
+                                                                        </ReactMarkdown>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="h-full flex items-center justify-center min-h-[120px]">
+                                                                        <div className="text-center text-muted-foreground/50">
+                                                                            <NotepadText className="h-12 w-12 mx-auto mb-3 opacity-40" />
+                                                                            <p className="text-lg">No details for this task</p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Card Footer */}
+                                                            <div className="px-6 py-3 md:px-10 md:py-4 border-t bg-muted/30 flex items-center justify-between shrink-0">
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    {activeAgenda.name}
+                                                                </span>
+                                                                <div className="flex items-center gap-3">
+                                                                    {/* Mini progress dots */}
+                                                                    <div className="hidden md:flex items-center gap-1.5">
+                                                                        {tasks.map((t, i) => (
+                                                                            <button
+                                                                                key={t.id}
+                                                                                onClick={() => goToSlide(i, i > currentIndex ? 'right' : 'left')}
+                                                                                className={cn(
+                                                                                    "h-2 rounded-full transition-all",
+                                                                                    i === currentIndex
+                                                                                        ? "w-6 bg-primary"
+                                                                                        : t.completed
+                                                                                            ? "w-2 bg-primary/40"
+                                                                                            : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                                                                                )}
+                                                                                aria-label={`Go to slide ${i + 1}`}
+                                                                            />
+                                                                        ))}
+                                                                    </div>
+                                                                    <span className="text-sm font-medium text-muted-foreground">
+                                                                        {currentIndex + 1} / {tasks.length}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        /* Behind/ahead cards — show just a teaser header */
+                                                        <div className="px-6 py-4 md:px-10 md:py-6 bg-gradient-to-br from-primary/5 via-transparent to-primary/10 flex-1">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className={cn(
+                                                                    "flex items-center justify-center h-10 w-10 rounded-full shrink-0 text-sm font-bold",
+                                                                    task.completed
+                                                                        ? "bg-primary/30 text-primary-foreground/70"
+                                                                        : "bg-primary/10 text-primary/60"
+                                                                )}>
+                                                                    {task.completed ? (
+                                                                        <CheckCircle2 className="h-5 w-5" />
+                                                                    ) : (
+                                                                        <span>{taskIndex + 1}</span>
+                                                                    )}
+                                                                </div>
+                                                                <span className={cn(
+                                                                    "text-lg font-semibold truncate",
+                                                                    task.completed && "line-through text-muted-foreground"
+                                                                )}>
+                                                                    {task.text}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
+
+                    {/* Slideshow empty state */}
+                    {presentationStyle === 'slideshow' && activeAgenda.tasks.length === 0 && (
+                        <div className="flex-1 flex items-center justify-center">
+                            <div className="text-center text-muted-foreground">
+                                <p className="text-lg">No items in this agenda</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Keyboard Hint */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground/50">
-                        Press ESC to exit
+                        {presentationStyle === 'slideshow'
+                            ? 'Use ← → arrows or Space to navigate · ESC to exit'
+                            : 'Press ESC to exit'
+                        }
                     </div>
                 </div>
             )}
@@ -1479,7 +1818,7 @@ export function Agenda() {
                                     <Button 
                                         variant="outline" 
                                         size="sm"
-                                        onClick={() => setIsPresentationMode(true)}
+                                        onClick={() => enterPresentationMode()}
                                         className="gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
                                         aria-label="Present agenda"
                                     >
