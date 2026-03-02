@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2 } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,9 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 
+
+type SortField = 'manual' | 'dueDate' | 'createdAt' | 'updatedAt';
+type SortOrder = 'asc' | 'desc';
 
 interface Task {
   id: string;
@@ -1162,6 +1165,10 @@ export function Agenda() {
         ));
     };
 
+    // Sorting state
+    const [sortField, setSortField] = useState<SortField>('manual');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
     // State for toggling relative/absolute time display per task
     const [showAbsoluteTime, setShowAbsoluteTime] = useState<Record<string, boolean>>({});
     const toggleTimeDisplay = (taskId: string) => {
@@ -1290,6 +1297,25 @@ export function Agenda() {
 
 
     const activeTasks = activeAgenda?.tasks || [];
+
+    const sortedTasks = useMemo(() => {
+        if (sortField === 'manual') return activeTasks;
+        const sorted = [...activeTasks].sort((a, b) => {
+            let aVal: number;
+            let bVal: number;
+            if (sortField === 'dueDate') {
+                // Tasks without a due date go to the end
+                aVal = a.dueDate ? new Date(a.dueDate).getTime() : (sortOrder === 'asc' ? Infinity : -Infinity);
+                bVal = b.dueDate ? new Date(b.dueDate).getTime() : (sortOrder === 'asc' ? Infinity : -Infinity);
+            } else {
+                aVal = new Date(a[sortField]).getTime();
+                bVal = new Date(b[sortField]).getTime();
+            }
+            return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+        return sorted;
+    }, [activeTasks, sortField, sortOrder]);
+
     const completedTasks = activeTasks.filter(task => task.completed).length;
     const totalTasks = activeTasks.length;
 
@@ -1800,6 +1826,63 @@ export function Agenda() {
                             </div>
                             {activeAgenda && (
                                 <div className="flex items-center gap-2 shrink-0">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant={sortField !== 'manual' ? 'default' : 'outline'}
+                                                size="sm"
+                                                className={cn(
+                                                    "gap-2 rounded-lg",
+                                                    sortField !== 'manual'
+                                                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                                                        : "hover:bg-primary/10 hover:border-primary/30"
+                                                )}
+                                                aria-label="Sort tasks"
+                                            >
+                                                <ArrowUpDown className="h-4 w-4" />
+                                                <span className="hidden sm:inline">Sort</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-52">
+                                            <DropdownMenuItem
+                                                onClick={() => { setSortField('manual'); }}
+                                                className={cn(sortField === 'manual' && 'bg-accent font-medium')}
+                                            >
+                                                <GripVertical className="h-4 w-4 mr-2" />
+                                                Manual (drag order)
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => { setSortField('dueDate'); setSortOrder(prev => sortField === 'dueDate' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'); }}
+                                                className={cn(sortField === 'dueDate' && 'bg-accent font-medium')}
+                                            >
+                                                <CalendarClock className="h-4 w-4 mr-2" />
+                                                Due Date
+                                                {sortField === 'dueDate' && (
+                                                    sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 ml-auto" /> : <ArrowDown className="h-3 w-3 ml-auto" />
+                                                )}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => { setSortField('createdAt'); setSortOrder(prev => sortField === 'createdAt' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'); }}
+                                                className={cn(sortField === 'createdAt' && 'bg-accent font-medium')}
+                                            >
+                                                <Calendar className="h-4 w-4 mr-2" />
+                                                Created Date
+                                                {sortField === 'createdAt' && (
+                                                    sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 ml-auto" /> : <ArrowDown className="h-3 w-3 ml-auto" />
+                                                )}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => { setSortField('updatedAt'); setSortOrder(prev => sortField === 'updatedAt' ? (prev === 'asc' ? 'desc' : 'asc') : 'asc'); }}
+                                                className={cn(sortField === 'updatedAt' && 'bg-accent font-medium')}
+                                            >
+                                                <Clock className="h-4 w-4 mr-2" />
+                                                Updated Date
+                                                {sortField === 'updatedAt' && (
+                                                    sortOrder === 'asc' ? <ArrowUp className="h-3 w-3 ml-auto" /> : <ArrowDown className="h-3 w-3 ml-auto" />
+                                                )}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                     <JsonEditorDialog
                                         tasks={activeAgenda.tasks}
                                         onSave={(newTasks) => updateTasksForActiveAgenda(newTasks)}
@@ -1853,7 +1936,7 @@ export function Agenda() {
                         </form>
                         <ScrollArea className="-mr-4 pr-4 flex-1">
                             <ul className="space-y-2 pr-2">
-                                {activeTasks.map((task, index) => {
+                                {sortedTasks.map((task, index) => {
                                     const isOverdue = task.dueDate && !task.completed && new Date(task.dueDate) < new Date();
                                     const isUrgent = task.dueDate && !task.completed && !isOverdue && (new Date(task.dueDate).getTime() - new Date().getTime()) < 4 * 60 * 60 * 1000;
                                     return (
