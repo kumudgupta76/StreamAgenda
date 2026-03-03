@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, ChevronDown, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown, PanelLeftClose, PanelLeftOpen, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, ChevronDown, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown, PanelLeftClose, PanelLeftOpen, ChevronsDownUp, ChevronsUpDown, Pencil, Eraser, Minus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -943,6 +943,125 @@ export function Agenda() {
     const [recentlyCompletedTaskId, setRecentlyCompletedTaskId] = useState<string | null>(null);
     const [listExpandAll, setListExpandAll] = useState(false);
     const [listExpandedIds, setListExpandedIds] = useState<Set<string>>(new Set());
+
+    // Drawing / annotation state for presentation mode
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [isDrawing, setIsDrawing] = useState(false);
+    const [drawingColor, setDrawingColor] = useState('#ef4444');
+    const [drawingSize, setDrawingSize] = useState(3);
+    const [showDrawingToolbar, setShowDrawingToolbar] = useState(false);
+    const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
+    const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+    const drawingColors = [
+        { value: '#ef4444', label: 'Red' },
+        { value: '#f59e0b', label: 'Yellow' },
+        { value: '#22c55e', label: 'Green' },
+        { value: '#3b82f6', label: 'Blue' },
+        { value: '#a855f7', label: 'Purple' },
+        { value: '#ffffff', label: 'White' },
+        { value: '#000000', label: 'Black' },
+    ];
+
+    const clearDrawingCanvas = useCallback(() => {
+        const canvas = drawingCanvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }, []);
+
+    const resizeDrawingCanvas = useCallback(() => {
+        const canvas = drawingCanvasRef.current;
+        if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        const ctx = canvas.getContext('2d');
+        if (ctx) ctx.scale(dpr, dpr);
+    }, []);
+
+    // Resize canvas when entering presentation mode
+    useEffect(() => {
+        if (!isPresentationMode) return;
+        // Small delay to let the overlay render
+        const timer = setTimeout(() => resizeDrawingCanvas(), 100);
+        window.addEventListener('resize', resizeDrawingCanvas);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', resizeDrawingCanvas);
+        };
+    }, [isPresentationMode, resizeDrawingCanvas]);
+
+    // Clear canvas when slide or style changes
+    useEffect(() => {
+        clearDrawingCanvas();
+    }, [presentationSlideIndex, presentationStyle, clearDrawingCanvas]);
+
+    // Reset drawing mode when leaving presentation
+    useEffect(() => {
+        if (!isPresentationMode) {
+            setIsDrawingMode(false);
+            setShowDrawingToolbar(false);
+        }
+    }, [isPresentationMode]);
+
+    const handleDrawStart = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawingMode) return;
+        setIsDrawing(true);
+        const canvas = drawingCanvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        let x: number, y: number;
+        if ('touches' in e) {
+            x = e.touches[0].clientX - rect.left;
+            y = e.touches[0].clientY - rect.top;
+        } else {
+            x = e.clientX - rect.left;
+            y = e.clientY - rect.top;
+        }
+        lastPointRef.current = { x, y };
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.beginPath();
+            ctx.arc(x, y, drawingSize / 2, 0, Math.PI * 2);
+            ctx.fillStyle = drawingColor;
+            ctx.fill();
+        }
+    }, [isDrawingMode, drawingColor, drawingSize]);
+
+    const handleDrawMove = useCallback((e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing || !isDrawingMode) return;
+        const canvas = drawingCanvasRef.current;
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        let x: number, y: number;
+        if ('touches' in e) {
+            e.preventDefault();
+            x = e.touches[0].clientX - rect.left;
+            y = e.touches[0].clientY - rect.top;
+        } else {
+            x = e.clientX - rect.left;
+            y = e.clientY - rect.top;
+        }
+        const ctx = canvas.getContext('2d');
+        if (ctx && lastPointRef.current) {
+            ctx.beginPath();
+            ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = drawingColor;
+            ctx.lineWidth = drawingSize;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+        lastPointRef.current = { x, y };
+    }, [isDrawing, isDrawingMode, drawingColor, drawingSize]);
+
+    const handleDrawEnd = useCallback(() => {
+        setIsDrawing(false);
+        lastPointRef.current = null;
+    }, []);
     
     // Play completion sound using Web Audio API
     const playCompletionSound = useCallback(() => {
@@ -1473,6 +1592,115 @@ export function Agenda() {
                         >
                             <X className="h-4 w-4" />
                         </Button>
+                    </div>
+
+                    {/* Drawing canvas overlay */}
+                    <canvas
+                        ref={drawingCanvasRef}
+                        className={cn(
+                            "absolute inset-0 w-full h-full z-[5]",
+                            isDrawingMode ? "cursor-crosshair" : "pointer-events-none"
+                        )}
+                        onMouseDown={handleDrawStart}
+                        onMouseMove={handleDrawMove}
+                        onMouseUp={handleDrawEnd}
+                        onMouseLeave={handleDrawEnd}
+                        onTouchStart={handleDrawStart}
+                        onTouchMove={handleDrawMove}
+                        onTouchEnd={handleDrawEnd}
+                    />
+
+                    {/* Drawing toolbar - top left */}
+                    <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+                        {/* Pencil toggle */}
+                        <Button
+                            variant={isDrawingMode ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => {
+                                const newMode = !isDrawingMode;
+                                setIsDrawingMode(newMode);
+                                setShowDrawingToolbar(newMode);
+                            }}
+                            className={cn(
+                                "gap-1.5 bg-background/80 backdrop-blur-sm",
+                                isDrawingMode && "bg-primary text-primary-foreground hover:bg-primary/90"
+                            )}
+                            title={isDrawingMode ? "Disable drawing" : "Enable drawing"}
+                        >
+                            <Pencil className="h-4 w-4" />
+                            <span className="hidden sm:inline text-xs">Draw</span>
+                        </Button>
+
+                        {/* Expanded toolbar when drawing mode is active */}
+                        {showDrawingToolbar && (
+                            <div className="flex items-center gap-2 rounded-lg border bg-background/90 backdrop-blur-sm px-3 py-1.5 animate-in fade-in slide-in-from-left-2 duration-200">
+                                {/* Color picker */}
+                                <div className="flex items-center gap-1">
+                                    {drawingColors.map(color => (
+                                        <button
+                                            key={color.value}
+                                            onClick={() => setDrawingColor(color.value)}
+                                            className={cn(
+                                                "h-6 w-6 rounded-full border-2 transition-transform hover:scale-110",
+                                                drawingColor === color.value
+                                                    ? "border-primary scale-110 ring-2 ring-primary/30"
+                                                    : "border-muted-foreground/30"
+                                            )}
+                                            style={{ backgroundColor: color.value }}
+                                            title={color.label}
+                                        />
+                                    ))}
+                                </div>
+
+                                {/* Separator */}
+                                <div className="w-px h-6 bg-border" />
+
+                                {/* Size control */}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setDrawingSize(s => Math.max(1, s - 1))}
+                                        className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted transition-colors"
+                                        title="Decrease size"
+                                    >
+                                        <Minus className="h-3 w-3" />
+                                    </button>
+                                    <div
+                                        className="flex items-center justify-center w-8"
+                                        title={`Size: ${drawingSize}px`}
+                                    >
+                                        <div
+                                            className="rounded-full"
+                                            style={{
+                                                width: Math.max(4, Math.min(drawingSize, 20)),
+                                                height: Math.max(4, Math.min(drawingSize, 20)),
+                                                backgroundColor: drawingColor,
+                                            }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => setDrawingSize(s => Math.min(20, s + 1))}
+                                        className="h-6 w-6 rounded flex items-center justify-center hover:bg-muted transition-colors"
+                                        title="Increase size"
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                    </button>
+                                </div>
+
+                                {/* Separator */}
+                                <div className="w-px h-6 bg-border" />
+
+                                {/* Clear */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearDrawingCanvas}
+                                    className="h-7 px-2 text-xs gap-1 hover:bg-destructive/10 hover:text-destructive"
+                                    title="Clear all drawings"
+                                >
+                                    <Eraser className="h-3.5 w-3.5" /> Clear
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* ===== LIST MODE (original) ===== */}
