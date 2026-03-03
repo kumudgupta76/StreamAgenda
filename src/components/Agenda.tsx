@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, ChevronDown, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown, PanelLeftClose, PanelLeftOpen, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -423,6 +423,8 @@ function AgendaList({
     sidebarWidth,
     onResizeStart,
     isResizing,
+    isCollapsed,
+    onToggleCollapse,
 }: {
     agendaGroups: AgendaGroup[];
     activeAgendaId: string | null;
@@ -444,6 +446,8 @@ function AgendaList({
     sidebarWidth?: number;
     onResizeStart?: (e: React.MouseEvent) => void;
     isResizing?: boolean;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
 }) {
     // Drag and drop state for reordering agendas
     const [draggedAgendaId, setDraggedAgendaId] = useState<string | null>(null);
@@ -482,9 +486,68 @@ function AgendaList({
             onClose();
         }
     };
+    // Collapsed sidebar view
+    if (isCollapsed && !isMobile) {
+        return (
+            <aside className="flex flex-col border-r h-full bg-gradient-to-b from-card to-card/95 w-[52px] transition-all duration-300">
+                <div className="p-2 border-b bg-card/50 backdrop-blur-sm flex flex-col items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onToggleCollapse}
+                        className="h-8 w-8 hover:bg-primary/10"
+                        title="Expand sidebar"
+                    >
+                        <PanelLeftOpen className="h-4 w-4" />
+                    </Button>
+                </div>
+                <ScrollArea className="flex-1">
+                    <div className="p-1.5 space-y-1 flex flex-col items-center">
+                        {agendaGroups
+                            .filter(a => !a.archived)
+                            .sort((a, b) => {
+                                if (a.pinned && !b.pinned) return -1;
+                                if (!a.pinned && b.pinned) return 1;
+                                return 0;
+                            })
+                            .map(agenda => {
+                                const taskCount = agenda.tasks.length;
+                                const completedCount = agenda.tasks.filter(t => t.completed).length;
+                                const allDone = taskCount > 0 && completedCount === taskCount;
+                                return (
+                                    <Button
+                                        key={agenda.id}
+                                        variant={activeAgendaId === agenda.id ? "secondary" : "ghost"}
+                                        size="icon"
+                                        onClick={() => handleAgendaSelect(agenda.id)}
+                                        className={cn(
+                                            "h-9 w-9 shrink-0 relative",
+                                            activeAgendaId === agenda.id && "shadow-sm ring-1 ring-primary/20"
+                                        )}
+                                        title={`${agenda.name} (${completedCount}/${taskCount})`}
+                                    >
+                                        <div className={cn(
+                                            "h-7 w-7 rounded-md flex items-center justify-center text-xs font-semibold transition-colors",
+                                            activeAgendaId === agenda.id ? "bg-primary text-primary-foreground" : "bg-muted",
+                                            allDone && "bg-green-500/20 text-green-600"
+                                        )}>
+                                            {agenda.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        {agenda.pinned && (
+                                            <Pin className="h-2.5 w-2.5 absolute -top-0.5 -right-0.5 text-blue-500" />
+                                        )}
+                                    </Button>
+                                );
+                            })}
+                    </div>
+                </ScrollArea>
+            </aside>
+        );
+    }
+
     return (
         <aside 
-            className="flex flex-col border-r h-full bg-gradient-to-b from-card to-card/95 relative"
+            className="flex flex-col border-r h-full bg-gradient-to-b from-card to-card/95 relative transition-all duration-300"
             style={{ width: isMobile ? '288px' : (sidebarWidth ?? 288) }}
         >
             {/* Resize handle - only show on desktop */}
@@ -519,11 +582,18 @@ function AgendaList({
                         </div>
                         <h2 className="text-lg font-semibold tracking-tight">My Agendas</h2>
                     </div>
-                    {isMobile && onClose && (
-                        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive">
-                            <X className="h-5 w-5" />
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-1">
+                        {!isMobile && onToggleCollapse && (
+                            <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="h-8 w-8 hover:bg-primary/10" title="Collapse sidebar">
+                                <PanelLeftClose className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {isMobile && onClose && (
+                            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive">
+                                <X className="h-5 w-5" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
@@ -871,6 +941,8 @@ export function Agenda() {
     const [presentationAnimation, setPresentationAnimation] = useState<'stack' | 'flip' | 'fade' | 'slide' | 'zoom'>('stack');
     const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
     const [recentlyCompletedTaskId, setRecentlyCompletedTaskId] = useState<string | null>(null);
+    const [listExpandAll, setListExpandAll] = useState(false);
+    const [listExpandedIds, setListExpandedIds] = useState<Set<string>>(new Set());
     
     // Play completion sound using Web Audio API
     const playCompletionSound = useCallback(() => {
@@ -903,6 +975,9 @@ export function Agenda() {
             // Audio not supported, fail silently
         }
     }, []);
+    
+    // Sidebar collapse state
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     
     // Sidebar resize state
     const [sidebarWidth, setSidebarWidth] = useState(288); // Default 288px (w-72)
@@ -951,6 +1026,12 @@ export function Agenda() {
     useEffect(() => {
         if (!isClient) return;
         try {
+            // Load sidebar collapsed state
+            const savedCollapsed = localStorage.getItem('sidebarCollapsed');
+            if (savedCollapsed === 'true') {
+                setIsSidebarCollapsed(true);
+            }
+            
             // Load sidebar width
             const savedSidebarWidth = localStorage.getItem('sidebarWidth');
             if (savedSidebarWidth) {
@@ -1413,7 +1494,29 @@ export function Agenda() {
                                             </h1>
                                         </div>
                                         <div className="flex items-center gap-2 text-muted-foreground text-xs md:text-sm shrink-0">
-                                            <span>{completedTasks}/{activeAgenda.tasks.length}</span>
+                                            {sortedTasks.some(t => t.details) && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (listExpandAll) {
+                                                            setListExpandAll(false);
+                                                            setListExpandedIds(new Set());
+                                                        } else {
+                                                            setListExpandAll(true);
+                                                            setListExpandedIds(new Set(sortedTasks.map(t => t.id)));
+                                                        }
+                                                    }}
+                                                    className="gap-1.5 text-xs hover:bg-primary/10"
+                                                >
+                                                    {listExpandAll ? (
+                                                        <><ChevronsDownUp className="h-3.5 w-3.5" /> Collapse All</>
+                                                    ) : (
+                                                        <><ChevronsUpDown className="h-3.5 w-3.5" /> Expand All</>
+                                                    )}
+                                                </Button>
+                                            )}
+                                            <span>{completedTasks}/{sortedTasks.length}</span>
                                             <span>completed</span>
                                         </div>
                                     </div>
@@ -1421,56 +1524,86 @@ export function Agenda() {
 
                                 {/* Tasks List */}
                                 <div className="flex-1 p-6 md:p-10 overflow-auto max-h-[60vh]">
-                                    {activeAgenda.tasks.length > 0 ? (
+                                    {sortedTasks.length > 0 ? (
+                                        <>
                                         <ul className="space-y-4">
-                                            {activeAgenda.tasks.map((task, index) => (
+                                            {sortedTasks.map((task, index) => {
+                                                const isItemExpanded = listExpandedIds.has(task.id);
+                                                const hasDetails = !!task.details;
+                                                return (
                                                 <li 
                                                     key={task.id}
                                                     className={cn(
-                                                        "flex items-start gap-4 p-4 rounded-xl border transition-all",
+                                                        "rounded-xl border transition-all",
                                                         task.completed 
                                                             ? "bg-primary/5 border-primary/20 opacity-70" 
                                                             : "bg-muted/30 border-transparent hover:border-primary/20"
                                                     )}
                                                 >
-                                                    <button
-                                                        onClick={() => handleToggleTask(task.id)}
-                                                        className={cn(
-                                                            "flex items-center justify-center h-8 w-8 rounded-full shrink-0 mt-0.5 transition-all",
-                                                            task.completed 
-                                                                ? "bg-primary text-primary-foreground" 
-                                                                : "bg-primary/10 text-primary hover:bg-primary/20"
-                                                        )}
-                                                        aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
-                                                    >
-                                                        {task.completed ? (
-                                                            <CheckCircle2 className="h-5 w-5" />
-                                                        ) : (
-                                                            <span className="font-bold text-sm">{index + 1}</span>
-                                                        )}
-                                                    </button>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-4 p-4">
+                                                        <button
+                                                            onClick={() => handleToggleTask(task.id)}
+                                                            className={cn(
+                                                                "flex items-center justify-center h-8 w-8 rounded-full shrink-0 transition-all",
+                                                                task.completed 
+                                                                    ? "bg-primary text-primary-foreground" 
+                                                                    : "bg-primary/10 text-primary hover:bg-primary/20"
+                                                            )}
+                                                            aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+                                                        >
+                                                            {task.completed ? (
+                                                                <CheckCircle2 className="h-5 w-5" />
+                                                            ) : (
+                                                                <span className="font-bold text-sm">{index + 1}</span>
+                                                            )}
+                                                        </button>
+                                                        <div
+                                                            className={cn(
+                                                                "flex-1 min-w-0 flex items-center gap-2",
+                                                                hasDetails && "cursor-pointer"
+                                                            )}
+                                                            onClick={() => {
+                                                                if (!hasDetails) return;
+                                                                setListExpandedIds(prev => {
+                                                                    const next = new Set(prev);
+                                                                    if (next.has(task.id)) {
+                                                                        next.delete(task.id);
+                                                                    } else {
+                                                                        next.add(task.id);
+                                                                    }
+                                                                    // Update expandAll state based on whether all are expanded
+                                                                    setListExpandAll(next.size === sortedTasks.filter(t => t.details).length);
+                                                                    return next;
+                                                                });
+                                                            }}
+                                                        >
                                                             <span className={cn(
-                                                                "text-lg md:text-xl font-medium",
+                                                                "text-lg md:text-xl font-medium flex-1",
                                                                 task.completed && "text-muted-foreground"
                                                             )}>
                                                                 {task.text}
                                                             </span>
+                                                            {hasDetails && (
+                                                                <ChevronDown className={cn(
+                                                                    "h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200",
+                                                                    isItemExpanded && "rotate-180"
+                                                                )} />
+                                                            )}
                                                         </div>
-                                                        {task.details && (
-                                                            <div className="mt-2 text-muted-foreground prose prose-sm dark:prose-invert max-w-none">
-                                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                                                                    a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
-                                                                }}>
-                                                                    {task.details}
-                                                                </ReactMarkdown>
-                                                            </div>
-                                                        )}
                                                     </div>
+                                                    {hasDetails && isItemExpanded && (
+                                                        <div className="px-4 pb-4 pl-16 text-muted-foreground prose prose-sm dark:prose-invert max-w-none animate-in fade-in slide-in-from-top-1 duration-200">
+                                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                                                a: ({...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                                                            }}>
+                                                                {task.details}
+                                                            </ReactMarkdown>
+                                                        </div>
+                                                    )}
                                                 </li>
-                                            ))}
+                                            )})}
                                         </ul>
+                                        </>
                                     ) : (
                                         <div className="text-center py-12 text-muted-foreground">
                                             <p className="text-lg">No items in this agenda</p>
@@ -1500,8 +1633,8 @@ export function Agenda() {
                     )}
 
                     {/* ===== SLIDESHOW MODE (stacked cards like PPT) ===== */}
-                    {presentationStyle === 'slideshow' && activeAgenda.tasks.length > 0 && (() => {
-                        const tasks = activeAgenda.tasks;
+                    {presentationStyle === 'slideshow' && sortedTasks.length > 0 && (() => {
+                        const tasks = sortedTasks;
                         const currentIndex = presentationSlideIndex;
                         const isFirst = currentIndex === 0;
                         const isLast = currentIndex === tasks.length - 1;
@@ -1720,7 +1853,7 @@ export function Agenda() {
                     })()}
 
                     {/* Slideshow empty state */}
-                    {presentationStyle === 'slideshow' && activeAgenda.tasks.length === 0 && (
+                    {presentationStyle === 'slideshow' && sortedTasks.length === 0 && (
                         <div className="flex-1 flex items-center justify-center">
                             <div className="text-center text-muted-foreground">
                                 <p className="text-lg">No items in this agenda</p>
@@ -1767,6 +1900,12 @@ export function Agenda() {
                     sidebarWidth={sidebarWidth}
                     onResizeStart={handleResizeStart}
                     isResizing={isResizing}
+                    isCollapsed={isSidebarCollapsed}
+                    onToggleCollapse={() => {
+                        const newVal = !isSidebarCollapsed;
+                        setIsSidebarCollapsed(newVal);
+                        localStorage.setItem('sidebarCollapsed', String(newVal));
+                    }}
                 />
             </div>
             
