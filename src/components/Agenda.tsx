@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, FormEvent, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useAuth } from '@/components/providers/auth-provider';
+import { loadUserData, saveUserData, subscribeToUserData } from '@/lib/firestore';
 import { Plus, Trash2, Edit, Save, MoreVertical, Trash, GripVertical, CheckCircle2, Circle, NotepadText, Eye, Archive, Menu, X, Sparkles, ListTodo, ChevronRight, ChevronLeft, ChevronDown, FileText, Presentation, Calendar, Clock, CalendarClock, AlertTriangle, CalendarX, Pin, PinOff, Braces, Copy, ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers, FlipVertical, ZoomIn, SlidersHorizontal, Wand2, ArrowUpDown, ArrowUp, ArrowDown, PanelLeftClose, PanelLeftOpen, ChevronsDownUp, ChevronsUpDown, Pencil, Eraser, Minus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -388,8 +390,6 @@ interface AgendaGroup {
   archived: boolean;
   pinned?: boolean;
 }
-
-const LOCAL_STORAGE_KEY = 'streamAgendaData_v3';
 
 const getDefaultAgendas = (): AgendaGroup[] => {
     return [
@@ -924,8 +924,13 @@ function TaskDetails({ task, onSave }: { task: Task, onSave: (details: string) =
 }
 
 export function Agenda() {
+    const { user } = useAuth();
     const [agendaGroups, setAgendaGroups] = useState<AgendaGroup[]>([]);
     const [activeAgendaId, setActiveAgendaId] = useState<string | null>(null);
+    // Track whether data was loaded from Firestore to avoid overwriting with defaults
+    const firestoreLoadedRef = useRef(false);
+    // Debounce timer for Firestore saves
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [newTaskText, setNewTaskText] = useState('');
     const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
     const [editingTaskText, setEditingTaskText] = useState('');
@@ -1120,8 +1125,7 @@ export function Agenda() {
 
         const handleMouseUp = () => {
             setIsResizing(false);
-            // Save sidebar width to localStorage
-            localStorage.setItem('sidebarWidth', String(sidebarWidth));
+            // Sidebar width will be persisted via the Firestore save effect
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -1141,32 +1145,30 @@ export function Agenda() {
         setIsClient(true);
     }, []);
 
-    // Load from localStorage on initial render
+    // Load data from Firestore when user is authenticated
     useEffect(() => {
-        if (!isClient) return;
-        try {
-            // Load sidebar collapsed state
-            const savedCollapsed = localStorage.getItem('sidebarCollapsed');
-            if (savedCollapsed === 'true') {
-                setIsSidebarCollapsed(true);
+        if (!isClient || !user) {
+            // If no user, reset to defaults
+            if (isClient && !user) {
+                firestoreLoadedRef.current = false;
+                const defaultAgendas = getDefaultAgendas();
+                setAgendaGroups(defaultAgendas);
+                setActiveAgendaId(defaultAgendas[0].id);
             }
-            
-            // Load sidebar width
-            const savedSidebarWidth = localStorage.getItem('sidebarWidth');
-            if (savedSidebarWidth) {
-                const width = parseInt(savedSidebarWidth, 10);
-                if (width >= minSidebarWidth && width <= maxSidebarWidth) {
-                    setSidebarWidth(width);
-                }
-            }
-            
-            const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                if (Array.isArray(parsedData) && parsedData.length > 0) {
-                    // Quick migration for old data structure
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadData = async () => {
+            try {
+                const data = await loadUserData(user.uid);
+                if (cancelled) return;
+
+                if (data && data.agendaGroups && data.agendaGroups.length > 0) {
+                    // Migrate old data structure
                     const now = new Date().toISOString();
-                    const migratedData = parsedData.map(group => ({
+                    const migratedData = data.agendaGroups.map(group => ({
                         ...group,
                         archived: group.archived ?? false,
                         tasks: group.tasks.map((task: any) => ({
@@ -1178,35 +1180,61 @@ export function Agenda() {
                         }))
                     }));
                     setAgendaGroups(migratedData);
-                    const activeId = localStorage.getItem('activeAgendaId');
+                    const activeId = data.activeAgendaId;
                     setActiveAgendaId(activeId && migratedData.some(g => g.id === activeId) ? activeId : migratedData[0].id);
+
+                    // Restore preferences
+                    if (data.preferences) {
+                        if (data.preferences.sidebarCollapsed) {
+                            setIsSidebarCollapsed(true);
+                        }
+                        if (data.preferences.sidebarWidth >= minSidebarWidth && data.preferences.sidebarWidth <= maxSidebarWidth) {
+                            setSidebarWidth(data.preferences.sidebarWidth);
+                        }
+                    }
                 } else {
                     const defaultAgendas = getDefaultAgendas();
                     setAgendaGroups(defaultAgendas);
                     setActiveAgendaId(defaultAgendas[0].id);
                 }
-            } else {
-                 const defaultAgendas = getDefaultAgendas();
-                setAgendaGroups(defaultAgendas);
-                setActiveAgendaId(defaultAgendas[0].id);
+                firestoreLoadedRef.current = true;
+            } catch (error) {
+                console.error('Failed to load from Firestore:', error);
+                if (!cancelled) {
+                    const defaultAgendas = getDefaultAgendas();
+                    setAgendaGroups(defaultAgendas);
+                    setActiveAgendaId(defaultAgendas[0].id);
+                    firestoreLoadedRef.current = true;
+                }
             }
-        } catch (error) {
-            console.error("Failed to load from localStorage", error);
-            const defaultAgendas = getDefaultAgendas();
-            setAgendaGroups(defaultAgendas);
-            setActiveAgendaId(defaultAgendas[0].id);
-        }
-    }, [isClient]);
+        };
 
-    // Save to localStorage whenever agendaGroups or activeAgendaId changes
+        loadData();
+
+        return () => { cancelled = true; };
+    }, [isClient, user]);
+
+    // Save to Firestore whenever agendaGroups or activeAgendaId changes (debounced)
     useEffect(() => {
-        if (isClient && agendaGroups.length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(agendaGroups));
-            if(activeAgendaId) {
-                localStorage.setItem('activeAgendaId', activeAgendaId);
-            }
-        }
-    }, [agendaGroups, activeAgendaId, isClient]);
+        if (!isClient || !user || !firestoreLoadedRef.current || agendaGroups.length === 0) return;
+
+        // Debounce writes to Firestore (500ms)
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => {
+            saveUserData(user.uid, {
+                agendaGroups,
+                activeAgendaId,
+                preferences: {
+                    sidebarWidth,
+                    sidebarCollapsed: isSidebarCollapsed,
+                },
+            }).catch(err => console.error('Failed to save to Firestore:', err));
+        }, 500);
+
+        return () => {
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        };
+    }, [agendaGroups, activeAgendaId, isClient, user, sidebarWidth, isSidebarCollapsed]);
 
 
     const activeAgenda = useMemo(() => agendaGroups.find(agenda => agenda.id === activeAgendaId), [agendaGroups, activeAgendaId]);
@@ -2132,7 +2160,7 @@ export function Agenda() {
                     onToggleCollapse={() => {
                         const newVal = !isSidebarCollapsed;
                         setIsSidebarCollapsed(newVal);
-                        localStorage.setItem('sidebarCollapsed', String(newVal));
+                        // Sidebar collapsed state will be persisted via the Firestore save effect
                     }}
                 />
             </div>
