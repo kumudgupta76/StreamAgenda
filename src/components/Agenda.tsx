@@ -11,8 +11,9 @@ import {
   ClipboardPaste, AlertCircle, LayoutList, GalleryHorizontalEnd, Layers,
   FlipVertical, ZoomIn, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown,
   PanelLeftClose, PanelLeftOpen, ChevronsDownUp, ChevronsUpDown, Pencil,
-  Eraser, Minus
+  Eraser, Minus, Cloud, CloudOff, Loader2
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -349,8 +350,9 @@ function AgendaList({ agendaGroups, activeAgendaId, setActiveAgendaId, handleCre
                     <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onMouseDown={() => handleRenameAgenda(agenda.id)}><Save className="h-3.5 w-3.5" /></Button>
                   </div>
                 ) : (
-                  <button onClick={() => handleSelect(agenda.id)}
-                    className={cn("w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-all group",
+                  <div role="button" tabIndex={0} onClick={() => handleSelect(agenda.id)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleSelect(agenda.id); }}
+                    className={cn("w-full flex items-center gap-2 px-2 py-2 rounded-lg text-left transition-all group cursor-pointer",
                       activeAgendaId === agenda.id ? "bg-primary/10 ring-1 ring-primary/20" : "hover:bg-muted/60")}>
                     <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 cursor-grab active:cursor-grabbing shrink-0" />
                     <div className={cn("h-7 w-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors relative",
@@ -363,7 +365,7 @@ function AgendaList({ agendaGroups, activeAgendaId, setActiveAgendaId, handleCre
                       {count > 0 && <span className="text-[10px] text-muted-foreground">{done}/{count}</span>}
                     </div>
                     <DropdownMenuForAgenda onRename={() => { setEditingAgendaId(agenda.id); setEditingAgendaName(agenda.name); }} onDelete={() => handleDeleteAgenda(agenda.id)} onArchive={() => handleArchiveAgenda(agenda.id)} onPin={() => handlePinAgenda(agenda.id)} disabled={agendaGroups.filter(a => !a.archived).length <= 1} isArchived={false} isPinned={agenda.pinned ?? false} />
-                  </button>
+                  </div>
                 )}
               </div>
             );
@@ -397,7 +399,11 @@ export function Agenda() {
   const [agendaGroups, setAgendaGroups] = useState<AgendaGroup[]>([]);
   const [activeAgendaId, setActiveAgendaId] = useState<string | null>(null);
   const firestoreLoadedRef = useRef(false);
+  const skipNextSaveRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const syncStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast } = useToast();
   const [newTaskText, setNewTaskText] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskText, setEditingTaskText] = useState('');
@@ -504,21 +510,56 @@ export function Agenda() {
           setActiveAgendaId(data.activeAgendaId && migrated.some(g => g.id === data.activeAgendaId) ? data.activeAgendaId : migrated[0].id);
           if (data.preferences) { if (data.preferences.sidebarCollapsed) setIsSidebarCollapsed(true); if (data.preferences.sidebarWidth >= minSidebarWidth && data.preferences.sidebarWidth <= maxSidebarWidth) setSidebarWidth(data.preferences.sidebarWidth); }
         } else { const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); }
+        skipNextSaveRef.current = true; // Skip the save triggered by setting loaded state
         firestoreLoadedRef.current = true;
-      } catch { if (!cancelled) { const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); firestoreLoadedRef.current = true; } }
+      } catch { if (!cancelled) { const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); skipNextSaveRef.current = true; firestoreLoadedRef.current = true; } }
     })();
     return () => { cancelled = true; };
   }, [isClient, user]);
 
-  // Firestore save (debounced)
+  // Firestore save (debounced) — only on actual user changes, not after initial load
   useEffect(() => {
     if (!isClient || !user || !firestoreLoadedRef.current || agendaGroups.length === 0) return;
+
+    // Skip the save that's triggered by the load effect setting state
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      console.log('[Firestore] Skipping save — data was just loaded from Firestore');
+      return;
+    }
+
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      saveUserData(user.uid, { agendaGroups, activeAgendaId, preferences: { sidebarWidth, sidebarCollapsed: isSidebarCollapsed } }).catch(err => console.error('Save error:', err));
-    }, 500);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [agendaGroups, activeAgendaId, isClient, user, sidebarWidth, isSidebarCollapsed]);
+
+    setSyncStatus('saving');
+
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        const payload = {
+          agendaGroups,
+          activeAgendaId,
+          preferences: { sidebarWidth, sidebarCollapsed: isSidebarCollapsed },
+        };
+        console.log('[Firestore] Saving data for user:', user.uid, 'agendas:', agendaGroups.length);
+        await saveUserData(user.uid, payload);
+        console.log('[Firestore] Save successful');
+        setSyncStatus('saved');
+        if (syncStatusTimerRef.current) clearTimeout(syncStatusTimerRef.current);
+        syncStatusTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2500);
+      } catch (err: any) {
+        console.error('[Firestore] Save failed:', err);
+        setSyncStatus('error');
+        toast({
+          title: 'Failed to save',
+          description: err?.message || 'Could not sync your data to the cloud. Check your connection.',
+          variant: 'destructive',
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [agendaGroups, activeAgendaId, isClient, user, sidebarWidth, isSidebarCollapsed, toast]);
 
   const activeAgenda = useMemo(() => agendaGroups.find(a => a.id === activeAgendaId), [agendaGroups, activeAgendaId]);
   const hasTasksWithDetails = useMemo(() => activeAgenda?.tasks.some(t => t.details?.trim()) ?? false, [activeAgenda]);
@@ -949,16 +990,45 @@ export function Agenda() {
             </ul>
           </ScrollArea>
 
-          {/* Footer stats */}
-          {activeAgenda && totalTasks > 0 && (
-            <div className="border-t bg-card/60 backdrop-blur-sm px-4 py-2.5 flex items-center justify-center">
-              {completedTasks === totalTasks ? (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium"><CheckCircle2 className="h-4 w-4" /><span>All done!</span><span>🎉</span></div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="text-lg font-bold text-primary">{completedTasks}</span><span>/</span><span className="text-base font-medium">{totalTasks}</span><span>completed</span></div>
+          {/* Footer stats + sync status */}
+          <div className="border-t bg-card/60 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
+            {/* Left: task stats */}
+            <div className="flex-1">
+              {activeAgenda && totalTasks > 0 && (
+                completedTasks === totalTasks ? (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-medium"><CheckCircle2 className="h-4 w-4" /><span>All done!</span><span>🎉</span></div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="text-lg font-bold text-primary">{completedTasks}</span><span>/</span><span className="text-base font-medium">{totalTasks}</span><span>completed</span></div>
+                )
               )}
             </div>
-          )}
+            {/* Right: sync status indicator */}
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground shrink-0">
+              {syncStatus === 'saving' && (
+                <span className="flex items-center gap-1 animate-in fade-in duration-200">
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  <span>Saving...</span>
+                </span>
+              )}
+              {syncStatus === 'saved' && (
+                <span className="flex items-center gap-1 text-green-600 dark:text-green-400 animate-in fade-in duration-200">
+                  <Cloud className="h-3 w-3" />
+                  <span>Synced</span>
+                </span>
+              )}
+              {syncStatus === 'error' && (
+                <span className="flex items-center gap-1 text-destructive animate-in fade-in duration-200">
+                  <CloudOff className="h-3 w-3" />
+                  <span>Sync failed</span>
+                </span>
+              )}
+              {syncStatus === 'idle' && user && (
+                <span className="flex items-center gap-1 opacity-50">
+                  <Cloud className="h-3 w-3" />
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </main>
     </div>
