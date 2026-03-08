@@ -5,12 +5,9 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Presentation, Mail, Lock, User, AlertCircle, Loader2 } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { CheckSquare, Mail, Lock, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 
-// Inline Google icon SVG to avoid external dependency
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -24,24 +21,16 @@ function GoogleIcon({ className }: { className?: string }) {
 
 function getFirebaseErrorMessage(code: string): string {
   switch (code) {
-    case 'auth/email-already-in-use':
-      return 'An account with this email already exists.';
-    case 'auth/invalid-email':
-      return 'Please enter a valid email address.';
-    case 'auth/weak-password':
-      return 'Password must be at least 6 characters.';
+    case 'auth/email-already-in-use': return 'An account with this email already exists.';
+    case 'auth/invalid-email': return 'Please enter a valid email address.';
+    case 'auth/weak-password': return 'Password must be at least 6 characters.';
     case 'auth/user-not-found':
     case 'auth/wrong-password':
-    case 'auth/invalid-credential':
-      return 'Invalid email or password.';
-    case 'auth/too-many-requests':
-      return 'Too many attempts. Please try again later.';
-    case 'auth/popup-closed-by-user':
-      return 'Sign-in popup was closed. Please try again.';
-    case 'auth/popup-blocked':
-      return 'Sign-in popup was blocked. Please allow popups and try again.';
-    default:
-      return 'An error occurred. Please try again.';
+    case 'auth/invalid-credential': return 'Invalid email or password.';
+    case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
+    case 'auth/popup-closed-by-user': return 'Sign-in popup was closed. Please try again.';
+    case 'auth/popup-blocked': return 'Sign-in popup was blocked. Please allow popups.';
+    default: return 'An error occurred. Please try again.';
   }
 }
 
@@ -50,12 +39,8 @@ export function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  // Sign In form state
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
-
-  // Sign Up form state
   const [signUpName, setSignUpName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
@@ -65,227 +50,176 @@ export function AuthPage() {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    try {
-      await signIn(signInEmail, signInPassword);
-    } catch (err: any) {
-      setError(getFirebaseErrorMessage(err.code));
-    } finally {
-      setIsLoading(false);
-    }
+    try { await signIn(signInEmail, signInPassword); }
+    catch (err: any) { setError(getFirebaseErrorMessage(err.code)); }
+    finally { setIsLoading(false); }
   };
 
   const handleSignUp = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (signUpPassword !== signUpConfirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (signUpPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-
+    if (signUpPassword !== signUpConfirmPassword) { setError('Passwords do not match.'); return; }
+    if (signUpPassword.length < 6) { setError('Password must be at least 6 characters.'); return; }
     setIsLoading(true);
-    try {
-      await signUp(signUpEmail, signUpPassword, signUpName || undefined);
-    } catch (err: any) {
-      setError(getFirebaseErrorMessage(err.code));
-    } finally {
-      setIsLoading(false);
-    }
+    try { await signUp(signUpEmail, signUpPassword, signUpName || undefined); }
+    catch (err: any) { setError(getFirebaseErrorMessage(err.code)); }
+    finally { setIsLoading(false); }
   };
 
   const handleGoogleSignIn = async () => {
     setError(null);
     setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-    } catch (err: any) {
-      setError(getFirebaseErrorMessage(err.code));
-    } finally {
-      setGoogleLoading(false);
-    }
+    try { await signInWithGoogle(); }
+    catch (err: any) { setError(getFirebaseErrorMessage(err.code)); }
+    finally { setGoogleLoading(false); }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-xl border-border/50">
-        <CardHeader className="text-center space-y-3 pb-2">
-          <div className="mx-auto h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Presentation className="h-7 w-7 text-primary" />
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* Left branding panel */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-[55%] bg-gradient-to-br from-primary/90 via-primary to-primary/80 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.12),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(255,255,255,0.08),transparent_40%)]" />
+        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20 text-primary-foreground">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="h-12 w-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <CheckSquare className="h-6 w-6" />
+            </div>
+            <span className="text-3xl font-bold font-headline tracking-tight">Task Buddy</span>
           </div>
-          <div>
-            <CardTitle className="text-2xl font-bold font-headline tracking-tight">Task Buddy</CardTitle>
-            <CardDescription className="text-sm mt-1">
-              Sign in to sync your agendas across devices
-            </CardDescription>
+          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-6">
+            Your agendas,<br />organized beautifully.
+          </h1>
+          <p className="text-lg text-primary-foreground/80 max-w-md leading-relaxed">
+            Create, manage, and present your task agendas with rich details, due dates, and beautiful presentation mode. Synced across all your devices.
+          </p>
+          <div className="flex flex-col gap-4 mt-10 max-w-sm">
+            {['Rich markdown task details', 'Presentation & slideshow mode', 'Real-time cloud sync'].map((feature) => (
+              <div key={feature} className="flex items-center gap-3 text-primary-foreground/90">
+                <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                  <ArrowRight className="h-3 w-3" />
+                </div>
+                <span className="text-sm font-medium">{feature}</span>
+              </div>
+            ))}
           </div>
-        </CardHeader>
+        </div>
+      </div>
 
-        <CardContent className="pt-4">
-          {/* Error display */}
+      {/* Right auth panel */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8 bg-background">
+        <div className="w-full max-w-[420px]">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-3 mb-8 lg:hidden">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <CheckSquare className="h-5 w-5 text-primary" />
+            </div>
+            <span className="text-2xl font-bold font-headline tracking-tight">Task Buddy</span>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold tracking-tight">Welcome back</h2>
+            <p className="text-muted-foreground mt-1.5 text-sm">Sign in to sync your agendas across devices</p>
+          </div>
+
           {error && (
-            <div className="flex items-start gap-2 p-3 mb-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+            <div className="flex items-start gap-2.5 p-3.5 mb-6 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm animate-in fade-in slide-in-from-top-1 duration-200">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Google Sign-In */}
           <Button
             variant="outline"
-            className="w-full h-11 gap-3 text-sm font-medium"
+            className="w-full h-12 gap-3 text-sm font-medium rounded-xl border-2 hover:bg-muted/50 transition-all"
             onClick={handleGoogleSignIn}
             disabled={googleLoading || isLoading}
           >
-            {googleLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <GoogleIcon className="h-5 w-5" />
-            )}
+            {googleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon className="h-5 w-5" />}
             Continue with Google
           </Button>
 
-          <div className="relative my-6">
-            <Separator />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-xs text-muted-foreground uppercase">
-              or
-            </span>
+          <div className="relative my-7">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div>
+            <div className="relative flex justify-center">
+              <span className="bg-background px-4 text-xs text-muted-foreground uppercase tracking-wider">or continue with email</span>
+            </div>
           </div>
 
           <Tabs defaultValue="signin" className="w-full" onValueChange={() => setError(null)}>
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 h-11 rounded-xl p-1">
+              <TabsTrigger value="signin" className="rounded-lg text-sm font-medium">Sign In</TabsTrigger>
+              <TabsTrigger value="signup" className="rounded-lg text-sm font-medium">Sign Up</TabsTrigger>
             </TabsList>
 
-            {/* Sign In Tab */}
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signin-email" className="text-sm font-medium">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={signInEmail}
-                      onChange={(e) => setSignInEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signin-email" type="email" placeholder="you@example.com" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={signInPassword}
-                      onChange={(e) => setSignInPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signin-password" type="password" placeholder="••••••••" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
                   </div>
                 </div>
-                <Button type="submit" className="w-full h-10" disabled={isLoading}>
+                <Button type="submit" className="w-full h-11 rounded-xl font-medium text-sm" disabled={isLoading}>
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Sign In
                 </Button>
               </form>
             </TabsContent>
 
-            {/* Sign Up Tab */}
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-sm font-medium">Name (optional)</Label>
+                  <Label htmlFor="signup-name" className="text-sm font-medium">Name <span className="text-muted-foreground font-normal">(optional)</span></Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Your name"
-                      value={signUpName}
-                      onChange={(e) => setSignUpName(e.target.value)}
-                      className="pl-10"
-                      disabled={isLoading}
-                    />
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signup-name" type="text" placeholder="Your name" value={signUpName} onChange={e => setSignUpName(e.target.value)} className="pl-10 h-11 rounded-xl" disabled={isLoading} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email" className="text-sm font-medium">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={signUpEmail}
-                      onChange={(e) => setSignUpEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signup-email" type="email" placeholder="you@example.com" value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="At least 6 characters"
-                      value={signUpPassword}
-                      onChange={(e) => setSignUpPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      minLength={6}
-                      disabled={isLoading}
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                      <Input id="signup-password" type="password" placeholder="6+ chars" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} className="pl-10 h-11 rounded-xl" required minLength={6} disabled={isLoading} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-confirm" className="text-sm font-medium">Confirm</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                      <Input id="signup-confirm" type="password" placeholder="••••••••" value={signUpConfirmPassword} onChange={e => setSignUpConfirmPassword(e.target.value)} className="pl-10 h-11 rounded-xl" required minLength={6} disabled={isLoading} />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-confirm" className="text-sm font-medium">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="signup-confirm"
-                      type="password"
-                      placeholder="••••••••"
-                      value={signUpConfirmPassword}
-                      onChange={(e) => setSignUpConfirmPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      minLength={6}
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-                <Button type="submit" className="w-full h-10" disabled={isLoading}>
+                <Button type="submit" className="w-full h-11 rounded-xl font-medium text-sm" disabled={isLoading}>
                   {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   Create Account
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
-        </CardContent>
 
-        <CardFooter className="justify-center pb-6">
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-[11px] text-muted-foreground text-center mt-8 leading-relaxed">
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </p>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
