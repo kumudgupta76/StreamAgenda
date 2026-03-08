@@ -38,11 +38,14 @@ function getUserDocRef(userId: string) {
 }
 
 /**
- * Recursively remove undefined values from an object/array,
+ * Recursively remove undefined values and convert them from objects/arrays,
  * since Firestore rejects undefined field values.
+ * - Object keys with undefined values are omitted.
+ * - null is preserved (Firestore accepts null).
  */
 function stripUndefined(obj: any): any {
-  if (obj === null || obj === undefined) return null;
+  if (obj === undefined) return null;
+  if (obj === null) return null;
   if (Array.isArray(obj)) return obj.map(stripUndefined);
   if (typeof obj === 'object' && obj.constructor === Object) {
     const clean: Record<string, any> = {};
