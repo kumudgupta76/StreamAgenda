@@ -14,7 +14,10 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   updateProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 
@@ -24,6 +27,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -34,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check for redirect result (from mobile Google sign-in)
+    getRedirectResult(auth).catch(() => {});
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -53,7 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    await signInWithPopup(auth, googleProvider);
+    // Use redirect on mobile (popups are unreliable), popup on desktop
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      await signInWithRedirect(auth, googleProvider);
+    } else {
+      await signInWithPopup(auth, googleProvider);
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
   };
 
   const logout = async () => {
@@ -61,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signInWithGoogle, resetPassword, logout }}>
       {children}
     </AuthContext.Provider>
   );
