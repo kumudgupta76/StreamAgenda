@@ -2382,9 +2382,7 @@ export function Agenda() {
                                                     />
                                                 ) : (
                                                     <div className="flex-1 min-w-0">
-                                                        <Label htmlFor={`task-${task.id}`} className={cn('text-base md:text-lg transition-colors cursor-text break-words block', task.completed ? 'line-through text-muted-foreground' : 'text-foreground')} onDoubleClick={() => handleStartEdit(task)}>
-                                                            {task.text}
-                                                        </Label>
+                                                        <span className={cn("text-sm sm:text-base font-medium transition-colors cursor-text break-words block leading-snug", task.completed ? "line-through text-muted-foreground" : "text-foreground")} onDoubleClick={() => handleStartEdit(task)}>{task.text}</span>
                                                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
                                                             {task.dueDate && (
                                                                 <DueDateBadge 
