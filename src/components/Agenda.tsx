@@ -895,7 +895,7 @@ export function Agenda() {
                           <Input value={editingTaskText} onChange={e => setEditingTaskText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSaveEdit(task.id); } if (e.key === 'Escape') handleCancelEdit(); }} onBlur={() => handleSaveEdit(task.id)} autoFocus className="flex-1 h-8 text-sm rounded-lg" />
                         ) : (
                           <div className="flex-1 min-w-0">
-                            <span className={cn("text-sm sm:text-base font-medium transition-colors cursor-text break-words block leading-snug", task.completed ? "line-through text-muted-foreground" : "text-foreground")} onDoubleClick={() => handleStartEdit(task)}>{task.text}</span>
+                            <Label htmlFor={`t-${task.id}`} className={cn("text-sm sm:text-base transition-colors cursor-text break-words block leading-snug", task.completed ? "line-through text-muted-foreground" : "text-foreground")} onDoubleClick={() => handleStartEdit(task)}>{task.text}</Label>
                             <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                               {task.dueDate && <DueDateBadge dueDate={task.dueDate} showAbsolute={showAbsoluteTime[task.id] ?? false} onClick={() => setShowAbsoluteTime(p => ({ ...p, [task.id]: !p[task.id] }))} completed={task.completed} />}
                               {task.details && <span className="text-[10px] text-muted-foreground/50 flex items-center gap-0.5"><NotepadText className="h-2.5 w-2.5" />notes</span>}
