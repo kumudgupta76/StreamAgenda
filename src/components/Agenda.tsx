@@ -399,9 +399,8 @@ export function Agenda() {
   const [agendaGroups, setAgendaGroups] = useState<AgendaGroup[]>([]);
   const [activeAgendaId, setActiveAgendaId] = useState<string | null>(null);
   const firestoreLoadedRef = useRef(false);
-  const lastSavedJsonRef = useRef<string>('');
+  const skipNextSaveRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveDataRef = useRef<any>(null);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const syncStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -498,113 +497,51 @@ export function Agenda() {
 
   // Firestore load
   useEffect(() => {
-    if (!isClient || !user) {
-      if (isClient && !user) {
-        firestoreLoadedRef.current = false;
-        lastSavedJsonRef.current = '';
-        const d = getDefaultAgendas();
-        setAgendaGroups(d);
-        setActiveAgendaId(d[0].id);
-      }
-      return;
-    }
+    if (!isClient || !user) { if (isClient && !user) { firestoreLoadedRef.current = false; const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); } return; }
     let cancelled = false;
     (async () => {
       try {
         const data = await loadUserData(user.uid);
         if (cancelled) return;
-
-        let loadedAgendas: AgendaGroup[];
-        let loadedActiveId: string | null;
-        let loadedSidebarWidth = 280;
-        let loadedSidebarCollapsed = false;
-
         if (data?.agendaGroups?.length) {
           const now = new Date().toISOString();
-          loadedAgendas = data.agendaGroups.map(g => ({
-            ...g,
-            archived: g.archived ?? false,
-            pinned: g.pinned ?? false,
-            tasks: g.tasks.map((t: any) => ({
-              ...t,
-              details: t.details ?? '',
-              createdAt: t.createdAt ?? now,
-              updatedAt: t.updatedAt ?? now,
-              dueDate: t.dueDate || undefined, // normalize null → undefined
-            }))
-          }));
-          loadedActiveId = data.activeAgendaId && loadedAgendas.some(g => g.id === data.activeAgendaId)
-            ? data.activeAgendaId : loadedAgendas[0].id;
-
-          if (data.preferences) {
-            if (data.preferences.sidebarCollapsed) loadedSidebarCollapsed = true;
-            if (data.preferences.sidebarWidth >= minSidebarWidth && data.preferences.sidebarWidth <= maxSidebarWidth) {
-              loadedSidebarWidth = data.preferences.sidebarWidth;
-            }
-          }
-        } else {
-          const d = getDefaultAgendas();
-          loadedAgendas = d;
-          loadedActiveId = d[0].id;
-        }
-
-        // Set all state
-        setAgendaGroups(loadedAgendas);
-        setActiveAgendaId(loadedActiveId);
-        setSidebarWidth(loadedSidebarWidth);
-        setIsSidebarCollapsed(loadedSidebarCollapsed);
-
-        // Snapshot what we loaded so save effect can compare against it
-        lastSavedJsonRef.current = JSON.stringify({
-          agendaGroups: loadedAgendas,
-          activeAgendaId: loadedActiveId,
-          preferences: { sidebarWidth: loadedSidebarWidth, sidebarCollapsed: loadedSidebarCollapsed },
-        });
+          const migrated = data.agendaGroups.map(g => ({ ...g, archived: g.archived ?? false, tasks: g.tasks.map((t: any) => ({ ...t, details: t.details ?? '', createdAt: t.createdAt ?? now, updatedAt: t.updatedAt ?? now, dueDate: t.dueDate })) }));
+          setAgendaGroups(migrated);
+          setActiveAgendaId(data.activeAgendaId && migrated.some(g => g.id === data.activeAgendaId) ? data.activeAgendaId : migrated[0].id);
+          if (data.preferences) { if (data.preferences.sidebarCollapsed) setIsSidebarCollapsed(true); if (data.preferences.sidebarWidth >= minSidebarWidth && data.preferences.sidebarWidth <= maxSidebarWidth) setSidebarWidth(data.preferences.sidebarWidth); }
+        } else { const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); }
+        skipNextSaveRef.current = true; // Skip the save triggered by setting loaded state
         firestoreLoadedRef.current = true;
-        console.log('[Firestore] Load complete — snapshot saved for change detection');
-      } catch (err) {
-        console.error('[Firestore] Load failed:', err);
-        if (!cancelled) {
-          const d = getDefaultAgendas();
-          setAgendaGroups(d);
-          setActiveAgendaId(d[0].id);
-          lastSavedJsonRef.current = '';
-          firestoreLoadedRef.current = true;
-        }
-      }
+      } catch { if (!cancelled) { const d = getDefaultAgendas(); setAgendaGroups(d); setActiveAgendaId(d[0].id); skipNextSaveRef.current = true; firestoreLoadedRef.current = true; } }
     })();
     return () => { cancelled = true; };
   }, [isClient, user]);
 
-  // Firestore save (debounced) — only when data actually changed from last save/load
+  // Firestore save (debounced) — only on actual user changes, not after initial load
   useEffect(() => {
     if (!isClient || !user || !firestoreLoadedRef.current || agendaGroups.length === 0) return;
 
-    const currentData = {
-      agendaGroups,
-      activeAgendaId,
-      preferences: { sidebarWidth, sidebarCollapsed: isSidebarCollapsed },
-    };
-    const currentJson = JSON.stringify(currentData);
-
-    // Skip if data hasn't actually changed
-    if (currentJson === lastSavedJsonRef.current) {
+    // Skip the save that's triggered by the load effect setting state
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      console.log('[Firestore] Skipping save — data was just loaded from Firestore');
       return;
     }
 
-    // Store pending data for beforeunload flush
-    pendingSaveDataRef.current = currentData;
-
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
+    setSyncStatus('saving');
+
     saveTimerRef.current = setTimeout(async () => {
-      setSyncStatus('saving');
       try {
+        const payload = {
+          agendaGroups,
+          activeAgendaId,
+          preferences: { sidebarWidth, sidebarCollapsed: isSidebarCollapsed },
+        };
         console.log('[Firestore] Saving data for user:', user.uid, 'agendas:', agendaGroups.length);
-        await saveUserData(user.uid, currentData);
+        await saveUserData(user.uid, payload);
         console.log('[Firestore] Save successful');
-        lastSavedJsonRef.current = currentJson;
-        pendingSaveDataRef.current = null;
         setSyncStatus('saved');
         if (syncStatusTimerRef.current) clearTimeout(syncStatusTimerRef.current);
         syncStatusTimerRef.current = setTimeout(() => setSyncStatus('idle'), 2500);
@@ -617,30 +554,12 @@ export function Agenda() {
           variant: 'destructive',
         });
       }
-    }, 1000);
+    }, 800);
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [agendaGroups, activeAgendaId, isClient, user, sidebarWidth, isSidebarCollapsed, toast]);
-
-  // Flush pending saves when user leaves the page
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (pendingSaveDataRef.current && user) {
-        // Use sendBeacon-style sync save — navigator.sendBeacon can't call Firestore,
-        // so we do a sync XHR-free approach: just let the last state persist via the
-        // debounced save. Cancel the timer and do an immediate fire-and-forget save.
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        try {
-          saveUserData(user.uid, pendingSaveDataRef.current);
-          console.log('[Firestore] Flushing pending save on page unload');
-        } catch {}
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [user]);
 
   const activeAgenda = useMemo(() => agendaGroups.find(a => a.id === activeAgendaId), [agendaGroups, activeAgendaId]);
   const hasTasksWithDetails = useMemo(() => activeAgenda?.tasks.some(t => t.details?.trim()) ?? false, [activeAgenda]);
