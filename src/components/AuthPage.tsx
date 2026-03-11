@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckSquare, Mail, Lock, User, AlertCircle, Loader2, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { CheckSquare, Mail, Lock, User, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -35,13 +35,10 @@ function getFirebaseErrorMessage(code: string): string {
 }
 
 export function AuthPage() {
-  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
   const [signUpName, setSignUpName] = useState('');
@@ -71,28 +68,10 @@ export function AuthPage() {
 
   const handleGoogleSignIn = async () => {
     setError(null);
-    setSuccessMsg(null);
     setGoogleLoading(true);
     try { await signInWithGoogle(); }
     catch (err: any) { setError(getFirebaseErrorMessage(err.code)); }
     finally { setGoogleLoading(false); }
-  };
-
-  const handleResetPassword = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccessMsg(null);
-    if (!resetEmail.trim()) { setError('Please enter your email address.'); return; }
-    setIsLoading(true);
-    try {
-      await resetPassword(resetEmail);
-      setSuccessMsg('Password reset email sent! Check your inbox.');
-      setResetEmail('');
-    } catch (err: any) {
-      setError(getFirebaseErrorMessage(err.code));
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -150,13 +129,6 @@ export function AuthPage() {
             </div>
           )}
 
-          {successMsg && (
-            <div className="flex items-start gap-2.5 p-3.5 mb-6 rounded-xl bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-400 text-sm animate-in fade-in slide-in-from-top-1 duration-200">
-              <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
           <Button
             variant="outline"
             className="w-full h-12 gap-3 text-sm font-medium rounded-xl border-2 hover:bg-muted/50 transition-all"
@@ -174,61 +146,33 @@ export function AuthPage() {
             </div>
           </div>
 
-          <Tabs defaultValue="signin" className="w-full" onValueChange={() => { setError(null); setSuccessMsg(null); setShowResetPassword(false); }}>
+          <Tabs defaultValue="signin" className="w-full" onValueChange={() => setError(null)}>
             <TabsList className="grid w-full grid-cols-2 mb-6 h-11 rounded-xl p-1">
               <TabsTrigger value="signin" className="rounded-lg text-sm font-medium">Sign In</TabsTrigger>
               <TabsTrigger value="signup" className="rounded-lg text-sm font-medium">Sign Up</TabsTrigger>
             </TabsList>
 
             <TabsContent value="signin">
-              {showResetPassword ? (
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  <button type="button" onClick={() => { setShowResetPassword(false); setError(null); setSuccessMsg(null); }} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
-                    <ArrowLeft className="h-3.5 w-3.5" /> Back to sign in
-                  </button>
-                  <div className="mb-2">
-                    <h3 className="text-base font-semibold">Reset your password</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Enter your email and we&apos;ll send you a reset link.</p>
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signin-email" className="text-sm font-medium">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signin-email" type="email" placeholder="you@example.com" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                      <Input id="reset-email" type="email" placeholder="you@example.com" value={resetEmail} onChange={e => setResetEmail(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
-                    </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input id="signin-password" type="password" placeholder="••••••••" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
                   </div>
-                  <Button type="submit" className="w-full h-11 rounded-xl font-medium text-sm" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Send Reset Link
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signin-email" className="text-sm font-medium">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                      <Input id="signin-email" type="email" placeholder="you@example.com" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="signin-password" className="text-sm font-medium">Password</Label>
-                      <button type="button" onClick={() => { setShowResetPassword(true); setResetEmail(signInEmail); setError(null); setSuccessMsg(null); }} className="text-xs text-primary hover:text-primary/80 font-medium transition-colors">
-                        Forgot password?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
-                      <Input id="signin-password" type="password" placeholder="••••••••" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} className="pl-10 h-11 rounded-xl" required disabled={isLoading} />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full h-11 rounded-xl font-medium text-sm" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Sign In
-                  </Button>
-                </form>
-              )}
+                </div>
+                <Button type="submit" className="w-full h-11 rounded-xl font-medium text-sm" disabled={isLoading}>
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Sign In
+                </Button>
+              </form>
             </TabsContent>
 
             <TabsContent value="signup">
