@@ -38,41 +38,17 @@ function getUserDocRef(userId: string) {
 }
 
 /**
- * Recursively remove undefined values from an object/array,
- * since Firestore rejects undefined field values.
- */
-function stripUndefined(obj: any): any {
-  if (obj === null || obj === undefined) return null;
-  if (Array.isArray(obj)) return obj.map(stripUndefined);
-  if (typeof obj === 'object' && obj.constructor === Object) {
-    const clean: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        clean[key] = stripUndefined(value);
-      }
-    }
-    return clean;
-  }
-  return obj;
-}
-
-/**
  * Load user data from Firestore.
  */
 export async function loadUserData(userId: string): Promise<UserData | null> {
   try {
-    const ref = getUserDocRef(userId);
-    console.log('[Firestore] Loading data from path:', ref.path);
-    const snap = await getDoc(ref);
+    const snap = await getDoc(getUserDocRef(userId));
     if (snap.exists()) {
-      const data = snap.data() as UserData;
-      console.log('[Firestore] Loaded data | agendas:', data.agendaGroups?.length ?? 0, '| updatedAt:', data.updatedAt);
-      return data;
+      return snap.data() as UserData;
     }
-    console.log('[Firestore] No document found for user:', userId);
     return null;
-  } catch (error: any) {
-    console.error('[Firestore] Failed to load:', error?.code, error?.message, error);
+  } catch (error) {
+    console.error('Failed to load user data from Firestore:', error);
     return null;
   }
 }
@@ -82,16 +58,12 @@ export async function loadUserData(userId: string): Promise<UserData | null> {
  */
 export async function saveUserData(userId: string, data: Partial<UserData>): Promise<void> {
   try {
-    const ref = getUserDocRef(userId);
-    const payload = stripUndefined({
+    await setDoc(getUserDocRef(userId), {
       ...data,
       updatedAt: new Date().toISOString(),
-    });
-    console.log('[Firestore] Writing to path:', ref.path, '| payload keys:', Object.keys(payload));
-    await setDoc(ref, payload, { merge: true });
-    console.log('[Firestore] Write successful for user:', userId);
-  } catch (error: any) {
-    console.error('[Firestore] Failed to save:', error?.code, error?.message, error);
+    }, { merge: true });
+  } catch (error) {
+    console.error('Failed to save user data to Firestore:', error);
     throw error;
   }
 }
