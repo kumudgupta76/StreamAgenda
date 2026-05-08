@@ -2268,6 +2268,16 @@ export function Agenda() {
                                     <Button 
                                         variant="outline" 
                                         size="sm"
+                                        onClick={() => enterPresentationMode('list')}
+                                        className="gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
+                                        aria-label="Present agenda"
+                                    >
+                                        <LayoutList  className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Present</span>
+                                    </Button>
+                                  <Button 
+                                        variant="outline" 
+                                        size="sm"
                                         onClick={() => enterPresentationMode()}
                                         className="gap-2 rounded-lg hover:bg-primary/10 hover:border-primary/30"
                                         aria-label="Present agenda"
