@@ -390,6 +390,8 @@ interface AgendaGroup {
 }
 
 const LOCAL_STORAGE_KEY = 'streamAgendaData_v3';
+const SORT_FIELD_KEY = 'streamAgendaSortField';
+const SORT_ORDER_KEY = 'streamAgendaSortOrder';
 
 const getDefaultAgendas = (): AgendaGroup[] => {
     return [
@@ -1145,6 +1147,17 @@ export function Agenda() {
     useEffect(() => {
         if (!isClient) return;
         try {
+            // Load sorting preferences
+            sortPrefsLoaded.current = true;
+            const savedSortField = localStorage.getItem(SORT_FIELD_KEY);
+            if (savedSortField === 'manual' || savedSortField === 'dueDate' || savedSortField === 'createdAt' || savedSortField === 'updatedAt') {
+                setSortField(savedSortField);
+            }
+            const savedSortOrder = localStorage.getItem(SORT_ORDER_KEY);
+            if (savedSortOrder === 'asc' || savedSortOrder === 'desc') {
+                setSortOrder(savedSortOrder);
+            }
+
             // Load sidebar collapsed state
             const savedCollapsed = localStorage.getItem('sidebarCollapsed');
             if (savedCollapsed === 'true') {
@@ -1368,6 +1381,14 @@ export function Agenda() {
     // Sorting state
     const [sortField, setSortField] = useState<SortField>('manual');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+    // Persist sorting preferences
+    const sortPrefsLoaded = useRef(false);
+    useEffect(() => {
+        if (!isClient || !sortPrefsLoaded.current) return;
+        localStorage.setItem(SORT_FIELD_KEY, sortField);
+        localStorage.setItem(SORT_ORDER_KEY, sortOrder);
+    }, [sortField, sortOrder, isClient]);
 
     // State for toggling relative/absolute time display per task
     const [showAbsoluteTime, setShowAbsoluteTime] = useState<Record<string, boolean>>({});
